@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Quivibe
 
 > La plateforme qui aide les Congolais à découvrir où sortir.
@@ -145,3 +146,6 @@ Voir [`docs/roadmap.md`](./docs/roadmap.md) pour le détail sprint par sprint. A
 ## 📜 Licence
 
 À définir.
+=======
+# Quivibe-newApp
+>>>>>>> 7739a9c458a60d7c990a985c706c3c5c86cff6a9
