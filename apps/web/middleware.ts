@@ -1,13 +1,41 @@
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-// Protection des routes (dashboard) et (admin).
-// La vérification de session/role réelle sera branchée sur Auth.js
-// une fois la feature `auth` implémentée (voir features/auth).
-export function middleware(request: NextRequest) {
-  return NextResponse.next();
-}
+// Note : (dashboard) et (admin) sont des route groups Next.js — leur nom
+// entre parenthèses n'apparaît PAS dans l'URL. On protège donc ici les
+// vrais chemins d'URL exposés par ces groupes, pas "/dashboard" ou "/admin"
+// littéralement. À tenir à jour à chaque nouvelle route ajoutée sous ces
+// groupes (ou migrer vers un vrai segment "/admin" si le back-office grandit).
+const OWNER_ONLY_PATHS = ["/places/new"];
+const ADMIN_ONLY_PATHS: string[] = [];
+
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const pathname = req.nextUrl.pathname;
+
+  const isOwnerRoute = OWNER_ONLY_PATHS.some((path) =>
+    pathname.startsWith(path)
+  );
+  const isAdminRoute = ADMIN_ONLY_PATHS.some((path) =>
+    pathname.startsWith(path)
+  );
+
+  if (!isLoggedIn && (isOwnerRoute || isAdminRoute)) {
+    const loginUrl = new URL("/login", req.nextUrl.origin);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const role = (req.auth?.user as { role?: string } | undefined)?.role;
+
+  if (isAdminRoute && role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/", req.nextUrl.origin));
+  }
+
+  if (isOwnerRoute && role !== "OWNER" && role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/", req.nextUrl.origin));
+  }
+});
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*"],
+  matcher: ["/places/new", "/places/:path*/edit", "/admin/:path*"],
 };

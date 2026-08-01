@@ -9,36 +9,44 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.9.0",
+    "@prisma/client": "^5.20.0",
+    "@react-leaflet/core": "^3.0.0",
+    "@tanstack/react-query": "^5.56.0",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.5.0",
+    "clsx": "^2.1.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.500.0",
     "next": "^15.0.0",
+    "next-auth": "^5.0.0-beta.20",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@prisma/client": "^5.20.0",
-    "next-auth": "^5.0.0-beta.20",
-    "zod": "^3.23.0",
     "react-hook-form": "^7.53.0",
-    "@hookform/resolvers": "^3.9.0",
-    "@tanstack/react-query": "^5.56.0",
-    "leaflet": "^1.9.4",
-    "react-leaflet": "^4.2.1",
-    "cloudinary": "^2.5.0",
+    "react-leaflet": "^5.0.0",
     "tailwind-merge": "^2.5.0",
-    "clsx": "^2.1.0",
-    "lucide-react": "^0.383.0"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/leaflet": "^1.9.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/leaflet": "^1.9.0",
-    "prisma": "^5.20.0",
-    "tailwindcss": "^3.4.0",
-    "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.0.0"
+    "eslint-config-next": "^15.0.0",
+    "postcss": "^8.4.0",
+    "prisma": "^5.20.0",
+    "tailwindcss": "^3.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }
