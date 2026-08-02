@@ -14,6 +14,9 @@ export async function Navbar() {
       <nav className="flex items-center gap-4 text-sm">
         {session?.user ? (
           <>
+            <Link href="/favoris" className="underline">
+              Favoris
+            </Link>
             <span className="text-gray-600">
               Bonjour, {session.user.name}
             </span>

@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
 import { getPlaceBySlugAction } from "@/features/places/actions";
+import { isFavoriteAction } from "@/features/favorites/actions";
+import { FavoriteButton } from "@/features/favorites/components/favorite-button";
+import { ReviewForm } from "@/features/reviews/components/review-form";
+import { auth } from "@/lib/auth";
 
 const PRICE_LABELS: Record<number, string> = {
   1: "$",
@@ -20,14 +24,27 @@ export default async function PlacePage({
     notFound();
   }
 
+  const session = await auth();
+  const isFavorite = await isFavoriteAction(place.id);
+  const hasAlreadyReviewed = session?.user
+    ? place.reviews.some((review) => review.authorId === session.user.id)
+    : false;
+
   return (
     <main className="px-6 py-10 flex flex-col gap-6 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-semibold">{place.name}</h1>
-        <p className="text-gray-600 text-sm mt-1">
-          {place.neighborhood} · {PRICE_LABELS[place.priceRange]} ·{" "}
-          {place.categories.map((c) => c.category.name).join(", ")}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{place.name}</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            {place.neighborhood} · {PRICE_LABELS[place.priceRange]} ·{" "}
+            {place.categories.map((c) => c.category.name).join(", ")}
+          </p>
+        </div>
+        <FavoriteButton
+          placeId={place.id}
+          initialIsFavorite={isFavorite}
+          isAuthenticated={!!session?.user}
+        />
       </div>
 
       <p className="text-gray-800">{place.description}</p>
@@ -37,10 +54,9 @@ export default async function PlacePage({
         {place.phone && <p>📞 {place.phone}</p>}
       </div>
 
-      <section>
-        <h2 className="text-lg font-medium mb-3">
-          Avis ({place.reviews.length})
-        </h2>
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-medium">Avis ({place.reviews.length})</h2>
+
         {place.reviews.length === 0 ? (
           <p className="text-gray-600 text-sm">
             Aucun avis pour le moment. Sois le premier à en laisser un !
@@ -56,6 +72,15 @@ export default async function PlacePage({
               </li>
             ))}
           </ul>
+        )}
+
+        {session?.user && !hasAlreadyReviewed && (
+          <ReviewForm placeId={place.id} />
+        )}
+        {!session?.user && (
+          <p className="text-sm text-gray-600">
+            Connecte-toi pour laisser un avis sur cet établissement.
+          </p>
         )}
       </section>
     </main>

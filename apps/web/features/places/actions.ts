@@ -1,121 +1,177 @@
+// apps/web/features/places/actions.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { slugify } from "@/utils/slugify";
-import {
-  createPlaceSchema,
-  listPlacesFilterSchema,
-  type ListPlacesFilter,
-} from "@/features/places/schema";
-import type { Place, Prisma } from "@prisma/client";
+import { z } from "zod";
 
-type ActionResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+// 1. Schéma de validation
+const getPlacesSchema = z.object({
+  search: z.string().optional(),
+  category: z.string().optional(),
+  neighborhood: z.string().optional(),
+});
 
-const PAGE_SIZE = 12;
+// 2. Fonction getPlaces (corrigée pour SQLite)
+export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
+  const validated = getPlacesSchema.parse(input);
 
-export async function createPlaceAction(
-  input: unknown
-): Promise<ActionResult<{ id: string; slug: string }>> {
-  const session = await auth();
+  const where: any = {
+    status: "APPROVED",
+  };
 
-  if (!session?.user || session.user.role !== "OWNER") {
-    return { success: false, error: "Action non autorisée" };
+  if (validated.search) {
+    // ✅ SQLite : contains est insensible à la casse par défaut
+    // Pas besoin de mode: "insensitive"
+    where.OR = [
+      { name: { contains: validated.search } },
+      { description: { contains: validated.search } },
+    ];
   }
 
-  const parsed = createPlaceSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: "Champs invalides",
-      fieldErrors: parsed.error.flatten().fieldErrors,
+  if (validated.neighborhood) {
+    // ✅ SQLite : equals est insensible à la casse par défaut
+    where.neighborhood = { equals: validated.neighborhood };
+  }
+
+  if (validated.category) {
+    where.categories = {
+      some: {
+        category: {
+          slug: validated.category,
+        },
+      },
     };
   }
 
-  const { categoryIds, ...placeData } = parsed.data;
-
-  const baseSlug = slugify(placeData.name);
-  let slug = baseSlug;
-  let suffix = 1;
-  while (await prisma.place.findUnique({ where: { slug } })) {
-    slug = `${baseSlug}-${suffix}`;
-    suffix += 1;
-  }
-
-  const place = await prisma.place.create({
-    data: {
-      ...placeData,
-      slug,
-      ownerId: session.user.id,
-      categories: {
-        create: categoryIds.map((categoryId) => ({ categoryId })),
-      },
-    },
-  });
-
-  return { success: true, data: { id: place.id, slug: place.slug } };
-}
-
-export async function listPlacesAction(
-  rawFilter: unknown
-): Promise<
-  ActionResult<{ places: Place[]; total: number; page: number; pageSize: number }>
-> {
-  const parsed = listPlacesFilterSchema.safeParse(rawFilter ?? {});
-  if (!parsed.success) {
-    return { success: false, error: "Filtres invalides" };
-  }
-
-  const filter: ListPlacesFilter = parsed.data;
-
-  const where: Prisma.PlaceWhereInput = {
-    status: "APPROVED",
-    ...(filter.neighborhood ? { neighborhood: filter.neighborhood } : {}),
-    ...(filter.priceRange ? { priceRange: filter.priceRange } : {}),
-    ...(filter.search
-      ? {
-          OR: [
-            { name: { contains: filter.search, mode: "insensitive" } },
-            { description: { contains: filter.search, mode: "insensitive" } },
-          ],
-        }
-      : {}),
-    ...(filter.categorySlug
-      ? { categories: { some: { category: { slug: filter.categorySlug } } } }
-      : {}),
-  };
-
-  const [places, total] = await Promise.all([
-    prisma.place.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (filter.page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-    prisma.place.count({ where }),
-  ]);
-
-  return {
-    success: true,
-    data: { places, total, page: filter.page, pageSize: PAGE_SIZE },
-  };
-}
-
-export async function getPlaceBySlugAction(slug: string) {
-  const place = await prisma.place.findUnique({
-    where: { slug, status: "APPROVED" },
+  const places = await prisma.place.findMany({
+    where,
     include: {
-      categories: { include: { category: true } },
+      categories: {
+        include: {
+          category: true,
+        },
+      },
       media: true,
       reviews: {
-        where: { status: "APPROVED" },
-        include: { author: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
+        select: {
+          rating: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 20,
+  });
+
+  return places.map((place) => ({
+    ...place,
+    averageRating: place.reviews.length > 0
+      ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
+      : null,
+  }));
+}
+
+// 3. Fonction getPlaceBySlug
+export async function getPlaceBySlug(slug: string) {
+  const place = await prisma.place.findUnique({
+    where: {
+      slug,
+      status: "APPROVED",
+    },
+    include: {
+      owner: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+      categories: {
+        include: {
+          category: true,
+        },
+      },
+      media: true,
+      reviews: {
+        where: {
+          status: "APPROVED",
+        },
+        include: {
+          author: {
+            select: {
+              name: true,
+              avatarUrl: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+      events: {
+        where: {
+          status: "APPROVED",
+          startDate: {
+            gte: new Date(),
+          },
+        },
+        orderBy: {
+          startDate: "asc",
+        },
+        take: 5,
       },
     },
   });
 
-  return place;
+  if (!place) {
+    return null;
+  }
+
+  const averageRating = place.reviews.length > 0
+    ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
+    : null;
+
+  return {
+    ...place,
+    averageRating,
+  };
+}
+
+// 4. Fonction getPlaceReviews
+export async function getPlaceReviews(placeId: string) {
+  return prisma.review.findMany({
+    where: {
+      placeId,
+      status: "APPROVED",
+    },
+    include: {
+      author: {
+        select: {
+          name: true,
+          avatarUrl: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 20,
+  });
+}
+
+// 5. Fonction getPlaceEvents
+export async function getPlaceEvents(placeId: string) {
+  return prisma.event.findMany({
+    where: {
+      placeId,
+      status: "APPROVED",
+      startDate: {
+        gte: new Date(),
+      },
+    },
+    orderBy: {
+      startDate: "asc",
+    },
+    take: 5,
+  });
 }

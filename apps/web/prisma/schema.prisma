@@ -1,67 +1,57 @@
 // Voir docs/database.md pour la documentation complète du modèle de données.
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
-  USER
-  OWNER
-  ADMIN
-}
-
-enum ModerationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String?
-  role         Role     @default(USER)
-  avatarUrl    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String?
+  role          String   @default("USER")  // "USER" | "OWNER" | "ADMIN"
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  places    Place[]    @relation("PlaceOwner")
-  reviews   Review[]
-  favorites Favorite[]
-  events    Event[]    @relation("EventOrganizer")
+  places        Place[]  @relation("PlaceOwner")
+  reviews       Review[]
+  favorites     Favorite[]
+  events        Event[]  @relation("EventOrganizer")
 
   @@map("users")
 }
 
+
 model Place {
-  id           String           @id @default(cuid())
-  name         String
-  slug         String           @unique
-  description  String
-  address      String
-  neighborhood String
-  latitude     Float
-  longitude    Float
-  priceRange   Int
-  phone        String?
-  status       ModerationStatus @default(PENDING)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String
+  address       String
+  neighborhood  String
+  latitude      Float
+  longitude     Float
+  priceRange    Int
+  phone         String?
+  status        String   @default("PENDING")  // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  owner   User   @relation("PlaceOwner", fields: [ownerId], references: [id])
-  ownerId String
+  owner         User     @relation("PlaceOwner", fields: [ownerId], references: [id])
+  ownerId       String
 
-  categories PlaceCategory[]
-  reviews    Review[]
-  favorites  Favorite[]
-  events     Event[]
-  media      Media[]
+  categories    PlaceCategory[]
+  reviews       Review[]
+  favorites     Favorite[]
+  events        Event[]
+  media         Media[]
 
   @@index([neighborhood])
   @@map("places")
@@ -88,17 +78,17 @@ model PlaceCategory {
 }
 
 model Review {
-  id        String           @id @default(cuid())
-  rating    Int
-  comment   String
-  status    ModerationStatus @default(APPROVED)
-  createdAt DateTime         @default(now())
+  id            String   @id @default(cuid())
+  rating        Int
+  comment       String
+  status        String   @default("APPROVED")  // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt     DateTime @default(now())
 
-  author   User   @relation(fields: [authorId], references: [id])
-  authorId String
+  author        User     @relation(fields: [authorId], references: [id])
+  authorId      String
 
-  place   Place  @relation(fields: [placeId], references: [id])
-  placeId String
+  place         Place    @relation(fields: [placeId], references: [id])
+  placeId       String
 
   @@index([placeId])
   @@map("reviews")
@@ -116,26 +106,27 @@ model Favorite {
 }
 
 model Event {
-  id          String           @id @default(cuid())
-  title       String
-  description String
-  startDate   DateTime
-  endDate     DateTime?
-  status      ModerationStatus @default(PENDING)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  startDate     DateTime
+  endDate       DateTime?
+  status        String   @default("PENDING")  // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  organizer   User   @relation("EventOrganizer", fields: [organizerId], references: [id])
-  organizerId String
+  organizer     User     @relation("EventOrganizer", fields: [organizerId], references: [id])
+  organizerId   String
 
-  place   Place  @relation(fields: [placeId], references: [id])
-  placeId String
+  place         Place    @relation(fields: [placeId], references: [id])
+  placeId       String
 
-  media Media[]
+  media         Media[]
 
   @@index([startDate])
   @@map("events")
 }
+
 
 model Media {
   id        String   @id @default(cuid())
