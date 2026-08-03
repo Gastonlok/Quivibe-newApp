@@ -4,14 +4,12 @@
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
-// 1. Schéma de validation
 const getPlacesSchema = z.object({
   search: z.string().optional(),
   category: z.string().optional(),
   neighborhood: z.string().optional(),
 });
 
-// 2. Fonction getPlaces (corrigée pour SQLite)
 export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
   const validated = getPlacesSchema.parse(input);
 
@@ -20,8 +18,6 @@ export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
   };
 
   if (validated.search) {
-    // ✅ SQLite : contains est insensible à la casse par défaut
-    // Pas besoin de mode: "insensitive"
     where.OR = [
       { name: { contains: validated.search } },
       { description: { contains: validated.search } },
@@ -29,7 +25,6 @@ export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
   }
 
   if (validated.neighborhood) {
-    // ✅ SQLite : equals est insensible à la casse par défaut
     where.neighborhood = { equals: validated.neighborhood };
   }
 
@@ -72,7 +67,6 @@ export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
   }));
 }
 
-// 3. Fonction getPlaceBySlug
 export async function getPlaceBySlug(slug: string) {
   const place = await prisma.place.findUnique({
     where: {
@@ -100,7 +94,8 @@ export async function getPlaceBySlug(slug: string) {
           author: {
             select: {
               name: true,
-              avatarUrl: true,
+              // ✅ Supprimer avatarUrl car il n'existe pas dans le modèle
+              // image: true, // Utiliser image à la place si disponible
             },
           },
         },
@@ -137,7 +132,6 @@ export async function getPlaceBySlug(slug: string) {
   };
 }
 
-// 4. Fonction getPlaceReviews
 export async function getPlaceReviews(placeId: string) {
   return prisma.review.findMany({
     where: {
@@ -148,7 +142,7 @@ export async function getPlaceReviews(placeId: string) {
       author: {
         select: {
           name: true,
-          avatarUrl: true,
+          // ✅ Supprimer avatarUrl
         },
       },
     },
@@ -159,7 +153,6 @@ export async function getPlaceReviews(placeId: string) {
   });
 }
 
-// 5. Fonction getPlaceEvents
 export async function getPlaceEvents(placeId: string) {
   return prisma.event.findMany({
     where: {
@@ -195,8 +188,6 @@ export async function getTopRatedPlaces() {
       },
     },
     orderBy: {
-      // On trie par note moyenne (calculé plus tard)
-      // Pour l'instant, on prend les plus récents avec avis
       reviews: {
         _count: "desc",
       },

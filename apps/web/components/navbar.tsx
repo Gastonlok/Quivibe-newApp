@@ -34,12 +34,13 @@ export function Navbar() {
   const user = session?.user;
   const isAuthenticated = status === "authenticated";
 
-  const navLinks = [
-    { href: "/", label: "Accueil", icon: Home },
-    { href: "/discover", label: "Découvrir", icon: Sparkles },
-    { href: "/map", label: "Carte", icon: MapPin },
-    { href: "/events", label: "Événements", icon: Calendar },
-  ];
+const navLinks = [
+  { href: "/", label: "Accueil", icon: Home },
+  { href: "/discover", label: "Découvrir", icon: Sparkles },
+  { href: "/map", label: "Carte", icon: MapPin },
+  { href: "/events", label: "Événements", icon: Calendar },
+];
+
 
   // Dashboard links selon le rôle
   const getDashboardLink = () => {
