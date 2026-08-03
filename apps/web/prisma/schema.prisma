@@ -1,5 +1,3 @@
-// apps/web/prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,16 +7,18 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-// ============================================
-// MODÈLES D'AUTHENTIFICATION
-// ============================================
-
 model User {
   id            String    @id @default(cuid())
   name          String
   email         String    @unique
   passwordHash  String?
   role          String    @default("USER") // "USER" | "OWNER" | "ADMIN"
+
+  // ✅ Nouveau champ pour le statut du propriétaire
+  ownerStatus   String?   // "PENDING" | "APPROVED" | "REJECTED" - null par défaut
+  ownerRequest  String?   // Raison ou message du propriétaire
+  ownerVerifiedAt DateTime? // Date de validation
+
   emailVerified DateTime?
   image         String?
   createdAt     DateTime  @default(now())
@@ -31,6 +31,9 @@ model User {
   reviews       Review[]
   favorites     Favorite[]
   events        Event[]   @relation("EventOrganizer")
+
+  // ✅ Ajouter la relation inverse pour OwnerRequest
+  ownerRequests OwnerRequest[] // Un utilisateur peut avoir plusieurs demandes
 
   @@map("users")
 }
@@ -74,6 +77,25 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// ✅ Nouveau modèle pour les demandes de propriétaires
+model OwnerRequest {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeName     String
+  placeAddress  String
+  placePhone    String?
+  description   String?
+  status        String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  adminNote     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  reviewedAt    DateTime?
+  reviewedBy    String?   // ID de l'admin qui a traité la demande
+
+  @@map("owner_requests")
+}
+
 // ============================================
 // MODÈLES DE L'APPLICATION
 // ============================================
@@ -93,9 +115,9 @@ model Place {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Relations
   owner         User      @relation("PlaceOwner", fields: [ownerId], references: [id])
   ownerId       String
+
   categories    PlaceCategory[]
   reviews       Review[]
   favorites     Favorite[]
@@ -110,8 +132,6 @@ model Category {
   id            String    @id @default(cuid())
   name          String    @unique
   slug          String    @unique
-
-  // Relations
   places        PlaceCategory[]
 
   @@map("categories")
@@ -131,10 +151,9 @@ model Review {
   id            String    @id @default(cuid())
   rating        Int
   comment       String
-  status        String    @default("APPROVED") // "PENDING" | "APPROVED" | "REJECTED"
+  status        String    @default("APPROVED") // "APPROVED" | "PENDING" | "REJECTED"
   createdAt     DateTime  @default(now())
 
-  // Relations
   author        User      @relation(fields: [authorId], references: [id])
   authorId      String
   place         Place     @relation(fields: [placeId], references: [id])
@@ -165,7 +184,6 @@ model Event {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Relations
   organizer     User      @relation("EventOrganizer", fields: [organizerId], references: [id])
   organizerId   String
   place         Place     @relation(fields: [placeId], references: [id])
@@ -181,8 +199,6 @@ model Media {
   url           String
   altText       String?
   createdAt     DateTime  @default(now())
-
-  // Relations (optionnelles)
   placeId       String?
   place         Place?    @relation(fields: [placeId], references: [id])
   eventId       String?

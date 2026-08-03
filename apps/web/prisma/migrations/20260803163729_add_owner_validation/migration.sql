@@ -5,6 +5,9 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "passwordHash" TEXT,
     "role" TEXT NOT NULL DEFAULT 'USER',
+    "ownerStatus" TEXT,
+    "ownerRequest" TEXT,
+    "ownerVerifiedAt" DATETIME,
     "emailVerified" DATETIME,
     "image" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -42,6 +45,23 @@ CREATE TABLE "verification_tokens" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expires" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "owner_requests" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "placeName" TEXT NOT NULL,
+    "placeAddress" TEXT NOT NULL,
+    "placePhone" TEXT,
+    "description" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "adminNote" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "reviewedAt" DATETIME,
+    "reviewedBy" TEXT,
+    CONSTRAINT "owner_requests_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
