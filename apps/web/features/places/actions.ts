@@ -175,3 +175,71 @@ export async function getPlaceEvents(placeId: string) {
     take: 5,
   });
 }
+
+export async function getTopRatedPlaces() {
+  const places = await prisma.place.findMany({
+    where: {
+      status: "APPROVED",
+    },
+    include: {
+      categories: {
+        include: {
+          category: true,
+        },
+      },
+      media: true,
+      reviews: {
+        select: {
+          rating: true,
+        },
+      },
+    },
+    orderBy: {
+      // On trie par note moyenne (calculé plus tard)
+      // Pour l'instant, on prend les plus récents avec avis
+      reviews: {
+        _count: "desc",
+      },
+    },
+    take: 6,
+  });
+
+  return places.map((place) => ({
+    ...place,
+    averageRating: place.reviews.length > 0
+      ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
+      : null,
+  }));
+}
+
+export async function getRecommendations() {
+  const places = await prisma.place.findMany({
+    where: {
+      status: "APPROVED",
+    },
+    include: {
+      categories: {
+        include: {
+          category: true,
+        },
+      },
+      media: true,
+      reviews: {
+        select: {
+          rating: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 6,
+  });
+
+  return places.map((place) => ({
+    ...place,
+    averageRating: place.reviews.length > 0
+      ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
+      : null,
+  }));
+}
