@@ -1,41 +1,59 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-// Note : (dashboard) et (admin) sont des route groups Next.js — leur nom
-// entre parenthèses n'apparaît PAS dans l'URL. On protège donc ici les
-// vrais chemins d'URL exposés par ces groupes, pas "/dashboard" ou "/admin"
-// littéralement. À tenir à jour à chaque nouvelle route ajoutée sous ces
-// groupes (ou migrer vers un vrai segment "/admin" si le back-office grandit).
-const OWNER_ONLY_PATHS = ["/places/new"];
-const ADMIN_ONLY_PATHS: string[] = [];
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+  });
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const pathname = req.nextUrl.pathname;
+  console.log("🔐 ===== MIDDLEWARE ===== 🔐");
+  console.log("🔐 Path:", path);
+  console.log("🔐 Token:", token);
+  console.log("🔐 Role:", token?.role);
 
-  const isOwnerRoute = OWNER_ONLY_PATHS.some((path) =>
-    pathname.startsWith(path)
-  );
-  const isAdminRoute = ADMIN_ONLY_PATHS.some((path) =>
-    pathname.startsWith(path)
-  );
-
-  if (!isLoggedIn && (isOwnerRoute || isAdminRoute)) {
-    const loginUrl = new URL("/login", req.nextUrl.origin);
-    return NextResponse.redirect(loginUrl);
+  // ============================================
+  // ROUTES ADMIN
+  // ============================================
+  if (path.startsWith("/admin")) {
+    if (!token) {
+      console.log("⛔ Non connecté → /login");
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (token.role !== "ADMIN") {
+      console.log("⛔ Pas admin → /");
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    console.log("✅ Admin autorisé");
+    return NextResponse.next();
   }
 
-  const role = (req.auth?.user as { role?: string } | undefined)?.role;
-
-  if (isAdminRoute && role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/", req.nextUrl.origin));
+  // ============================================
+  // ROUTES OWNER
+  // ============================================
+  if (path.startsWith("/owner")) {
+    if (!token) {
+      console.log("⛔ Non connecté → /login");
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (token.role !== "OWNER" && token.role !== "ADMIN") {
+      console.log("⛔ Pas owner → /");
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    console.log("✅ Owner autorisé");
+    return NextResponse.next();
   }
 
-  if (isOwnerRoute && role !== "OWNER" && role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/", req.nextUrl.origin));
-  }
-});
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: ["/places/new", "/places/:path*/edit", "/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/owner/:path*",
+    "/favorites",
+    "/profile",
+  ],
 };

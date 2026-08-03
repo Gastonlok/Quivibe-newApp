@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Home,
@@ -16,16 +16,23 @@ import {
   Bell,
   Sparkles,
   Utensils,
-  Users
+  Users,
+  Shield,
+  Store
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSession, signOut } from "next-auth/react";
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const isActive = (path: string) => pathname === path;
+  const user = session?.user;
+  const isAuthenticated = status === "authenticated";
 
   const navLinks = [
     { href: "/", label: "Accueil", icon: Home },
@@ -33,6 +40,19 @@ export function Navbar() {
     { href: "/map", label: "Carte", icon: MapPin },
     { href: "/events", label: "Événements", icon: Calendar },
   ];
+
+  // Dashboard links selon le rôle
+  const getDashboardLink = () => {
+    if (user?.role === "ADMIN") return { href: "/admin/dashboard", label: "Admin", icon: Shield };
+    if (user?.role === "OWNER") return { href: "/owner/dashboard", label: "Dashboard", icon: Store };
+    return null;
+  };
+
+  const dashboardLink = getDashboardLink();
+
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: "/" });
+  };
 
   return (
     <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 shadow-sm">
@@ -84,47 +104,72 @@ export function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* Bouton Recherche Mobile */}
-            <button
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="md:hidden p-2 text-gray-500 hover:text-primary-600 transition-colors"
-            >
-              <Search className="w-5 h-5" />
-            </button>
+            {/* Dashboard link pour admin/owner */}
+            {dashboardLink && (
+              <Link
+                href={dashboardLink.href}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-50 text-primary-600 rounded-full hover:bg-primary-100 transition-colors"
+              >
+                <dashboardLink.icon className="w-4 h-4" />
+                {dashboardLink.label}
+              </Link>
+            )}
 
             {/* Notifications */}
-            <button className="relative p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            {isAuthenticated && (
+              <button className="relative p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50">
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+              </button>
+            )}
 
             {/* Favoris */}
-            <Link
-              href="/favorites"
-              className="p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50"
-            >
-              <Heart className="w-5 h-5" />
-            </Link>
+            {isAuthenticated && (
+              <Link
+                href="/favorites"
+                className="p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50"
+              >
+                <Heart className="w-5 h-5" />
+              </Link>
+            )}
 
             {/* Profil / Connexion */}
-            <div className="hidden md:block">
-              <Link
-                href="/login"
-                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-full hover:shadow-lg hover:shadow-primary-200/50 transition-all duration-300 hover:scale-105"
-              >
-                Se connecter
-              </Link>
-            </div>
-
-            {/* Inscription */}
-            <div className="hidden md:block">
-              <Link
-                href="/register"
-                className="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-              >
-                S'inscrire
-              </Link>
-            </div>
+            {isAuthenticated ? (
+              <div className="hidden md:flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full">
+                  <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-primary-600 font-semibold text-xs">
+                      {user?.name?.charAt(0).toUpperCase() || "U"}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.name?.split(" ")[0] || "Utilisateur"}
+                  </span>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
+                  title="Déconnexion"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden md:inline-flex px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-full hover:shadow-lg hover:shadow-primary-200/50 transition-all duration-300 hover:scale-105"
+                >
+                  Se connecter
+                </Link>
+                <Link
+                  href="/register"
+                  className="hidden md:inline-flex px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                >
+                  S'inscrire
+                </Link>
+              </>
+            )}
 
             {/* Menu Mobile */}
             <button
@@ -194,23 +239,72 @@ export function Navbar() {
                   );
                 })}
 
-                <div className="border-t border-gray-100 my-3 pt-3">
+                {/* Dashboard link dans menu mobile */}
+                {dashboardLink && (
                   <Link
-                    href="/login"
+                    href={dashboardLink.href}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary-600 bg-primary-50"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <dashboardLink.icon className="w-5 h-5" />
+                    <span className="text-sm font-medium">{dashboardLink.label}</span>
+                  </Link>
+                )}
+
+                {/* Favoris dans menu mobile */}
+                {isAuthenticated && (
+                  <Link
+                    href="/favorites"
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <User className="w-5 h-5" />
-                    <span className="text-sm font-medium">Se connecter</span>
+                    <Heart className="w-5 h-5" />
+                    <span className="text-sm font-medium">Mes favoris</span>
                   </Link>
-                  <Link
-                    href="/register"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Users className="w-5 h-5" />
-                    <span className="text-sm font-medium">S'inscrire</span>
-                  </Link>
+                )}
+
+                <div className="border-t border-gray-100 my-3 pt-3">
+                  {isAuthenticated ? (
+                    <>
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                          <span className="text-primary-600 font-semibold text-sm">
+                            {user?.name?.charAt(0).toUpperCase() || "U"}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{user?.name}</p>
+                          <p className="text-xs text-gray-500">{user?.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors w-full"
+                      >
+                        <LogOut className="w-5 h-5" />
+                        <span className="text-sm font-medium">Déconnexion</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/login"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <User className="w-5 h-5" />
+                        <span className="text-sm font-medium">Se connecter</span>
+                      </Link>
+                      <Link
+                        href="/register"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Users className="w-5 h-5" />
+                        <span className="text-sm font-medium">S'inscrire</span>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>

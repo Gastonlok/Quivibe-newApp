@@ -1,38 +1,87 @@
-// Voir docs/database.md pour la documentation complète du modèle de données.
+// apps/web/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "sqlite"
   url      = "file:./dev.db"
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
+// ============================================
+// MODÈLES D'AUTHENTIFICATION
+// ============================================
 
 model User {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
-  email         String   @unique
+  email         String    @unique
   passwordHash  String?
-  role          String   @default("USER")  // "USER" | "OWNER" | "ADMIN"
-  avatarUrl     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          String    @default("USER") // "USER" | "OWNER" | "ADMIN"
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  places        Place[]  @relation("PlaceOwner")
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  places        Place[]   @relation("PlaceOwner")
   reviews       Review[]
   favorites     Favorite[]
-  events        Event[]  @relation("EventOrganizer")
+  events        Event[]   @relation("EventOrganizer")
 
   @@map("users")
 }
 
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// MODÈLES DE L'APPLICATION
+// ============================================
 
 model Place {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
-  slug          String   @unique
+  slug          String    @unique
   description   String
   address       String
   neighborhood  String
@@ -40,13 +89,13 @@ model Place {
   longitude     Float
   priceRange    Int
   phone         String?
-  status        String   @default("PENDING")  // "PENDING" | "APPROVED" | "REJECTED"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status        String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  owner         User     @relation("PlaceOwner", fields: [ownerId], references: [id])
+  // Relations
+  owner         User      @relation("PlaceOwner", fields: [ownerId], references: [id])
   ownerId       String
-
   categories    PlaceCategory[]
   reviews       Review[]
   favorites     Favorite[]
@@ -58,36 +107,37 @@ model Place {
 }
 
 model Category {
-  id   String @id @default(cuid())
-  name String @unique
-  slug String @unique
+  id            String    @id @default(cuid())
+  name          String    @unique
+  slug          String    @unique
 
-  places PlaceCategory[]
+  // Relations
+  places        PlaceCategory[]
 
   @@map("categories")
 }
 
 model PlaceCategory {
-  place      Place    @relation(fields: [placeId], references: [id])
-  placeId    String
-  category   Category @relation(fields: [categoryId], references: [id])
-  categoryId String
+  place         Place     @relation(fields: [placeId], references: [id])
+  placeId       String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  categoryId    String
 
   @@id([placeId, categoryId])
   @@map("place_categories")
 }
 
 model Review {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   rating        Int
   comment       String
-  status        String   @default("APPROVED")  // "PENDING" | "APPROVED" | "REJECTED"
-  createdAt     DateTime @default(now())
+  status        String    @default("APPROVED") // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt     DateTime  @default(now())
 
-  author        User     @relation(fields: [authorId], references: [id])
+  // Relations
+  author        User      @relation(fields: [authorId], references: [id])
   authorId      String
-
-  place         Place    @relation(fields: [placeId], references: [id])
+  place         Place     @relation(fields: [placeId], references: [id])
   placeId       String
 
   @@index([placeId])
@@ -95,50 +145,48 @@ model Review {
 }
 
 model Favorite {
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  place     Place    @relation(fields: [placeId], references: [id])
-  placeId   String
-  createdAt DateTime @default(now())
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+  place         Place     @relation(fields: [placeId], references: [id])
+  placeId       String
+  createdAt     DateTime  @default(now())
 
   @@id([userId, placeId])
   @@map("favorites")
 }
 
 model Event {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   title         String
   description   String
   startDate     DateTime
   endDate       DateTime?
-  status        String   @default("PENDING")  // "PENDING" | "APPROVED" | "REJECTED"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status        String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  organizer     User     @relation("EventOrganizer", fields: [organizerId], references: [id])
+  // Relations
+  organizer     User      @relation("EventOrganizer", fields: [organizerId], references: [id])
   organizerId   String
-
-  place         Place    @relation(fields: [placeId], references: [id])
+  place         Place     @relation(fields: [placeId], references: [id])
   placeId       String
-
   media         Media[]
 
   @@index([startDate])
   @@map("events")
 }
 
-
 model Media {
-  id        String   @id @default(cuid())
-  url       String
-  altText   String?
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  url           String
+  altText       String?
+  createdAt     DateTime  @default(now())
 
-  place   Place?  @relation(fields: [placeId], references: [id])
-  placeId String?
-
-  event   Event?  @relation(fields: [eventId], references: [id])
-  eventId String?
+  // Relations (optionnelles)
+  placeId       String?
+  place         Place?    @relation(fields: [placeId], references: [id])
+  eventId       String?
+  event         Event?    @relation(fields: [eventId], references: [id])
 
   @@map("media")
 }
