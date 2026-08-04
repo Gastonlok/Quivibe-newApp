@@ -14,6 +14,8 @@ import {
   Search,
   Heart,
   Bell,
+   Building2,  // ✅ Ajouter cette icône
+  LayoutDashboard,  // ✅ Ajouter aussi celle-ci si nécessaire
   Sparkles,
   Utensils,
   Users,
@@ -39,6 +41,7 @@ const navLinks = [
   { href: "/discover", label: "Découvrir", icon: Sparkles },
   { href: "/map", label: "Carte", icon: MapPin },
   { href: "/events", label: "Événements", icon: Calendar },
+  { href: "/owners", label: "Espace pro", icon: Building2 }, // ✅ Nouveau libellé
 ];
 
 
