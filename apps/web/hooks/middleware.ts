@@ -104,10 +104,10 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",    // ⚠️ C'est l'URL réelle !!!
-    "/places/new",
-    "/places/:path*/edit",
-    "/favorites",
+    "/admin/:path*",
+    "/owner/:path*",
+    "/favorites",      // ✅ Ajouter cette ligne
+    "/favorites/:path*", // ✅ Pour les sous-routes
     "/profile",
   ],
 };

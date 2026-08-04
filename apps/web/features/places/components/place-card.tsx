@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Star, MapPin, Heart, Utensils } from "lucide-react";
+import { Star, MapPin, Utensils } from "lucide-react";
 import { AnimatedCard } from "@/components/animated-section";
+import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 
 interface PlaceCardProps {
   place: {
@@ -15,7 +16,6 @@ interface PlaceCardProps {
     media: { url: string; altText: string | null }[];
     categories: { category: { name: string } }[];
     priceRange: number;
-    // ✅ Ajouter la propriété reviews optionnelle
     reviews?: { rating: number }[];
   };
 }
@@ -29,7 +29,6 @@ export function PlaceCard({ place }: PlaceCardProps) {
   return (
     <AnimatedCard className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-200 transition-all duration-300">
       <Link href={`/places/${place.slug}`} className="block group">
-        {/* Image avec overlay */}
         <div className="relative h-56 overflow-hidden">
           <Image
             src={mainImage}
@@ -39,10 +38,8 @@ export function PlaceCard({ place }: PlaceCardProps) {
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
 
-          {/* Overlay gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-          {/* Badge de note */}
           {place.averageRating !== null && (
             <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
               <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -53,25 +50,17 @@ export function PlaceCard({ place }: PlaceCardProps) {
             </div>
           )}
 
-          {/* Badge de catégorie avec icône */}
           <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5">
             <Utensils className="w-3.5 h-3.5 text-white" />
             <span className="text-white text-xs font-medium">{category}</span>
           </div>
 
-          {/* Bouton favoris */}
-          <button
-            className="absolute top-3 left-3 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-all hover:scale-110"
-            onClick={(e) => {
-              e.preventDefault();
-              // TODO: Ajouter aux favoris
-            }}
-          >
-            <Heart className="w-4 h-4 text-gray-600 hover:text-red-500 transition-colors" />
-          </button>
+          {/* ✅ Bouton favoris */}
+          <div className="absolute top-3 left-3">
+            <FavoriteButton placeId={place.id} size="sm" />
+          </div>
         </div>
 
-        {/* Contenu */}
         <div className="p-4">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -93,7 +82,6 @@ export function PlaceCard({ place }: PlaceCardProps) {
             <span className="truncate">{place.neighborhood}</span>
           </div>
 
-          {/* Note avec étoiles */}
           <div className="mt-3 flex items-center gap-2">
             <div className="flex items-center gap-0.5">
               {[...Array(5)].map((_, i) => (
@@ -117,7 +105,6 @@ export function PlaceCard({ place }: PlaceCardProps) {
             </span>
           </div>
 
-          {/* Badge de statut */}
           <div className="mt-3 flex items-center gap-2">
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />

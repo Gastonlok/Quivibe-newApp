@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession, signOut } from "next-auth/react";
+import { useEffect} from "react";
+import { getFavoriteCount } from "@/features/favorites/actions";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -31,7 +33,7 @@ export function Navbar() {
   const { data: session, status } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
+  const [favoriteCount, setFavoriteCount] = useState(0);
   const isActive = (path: string) => pathname === path;
   const user = session?.user;
   const isAuthenticated = status === "authenticated";
@@ -129,12 +131,17 @@ const navLinks = [
 
             {/* Favoris */}
             {isAuthenticated && (
-              <Link
-                href="/favorites"
-                className="p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50"
-              >
-                <Heart className="w-5 h-5" />
-              </Link>
+                          <Link
+              href="/favorites"
+              className="p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50 relative"
+            >
+              <Heart className="w-5 h-5" />
+              {favoriteCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  {favoriteCount > 9 ? "9+" : favoriteCount}
+                </span>
+              )}
+            </Link>
             )}
 
             {/* Profil / Connexion */}

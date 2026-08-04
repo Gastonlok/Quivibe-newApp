@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Heart, Loader2, MapPin, Star, Utensils } from "lucide-react";
+import { Heart, Loader2, MapPin, Star } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { getFavorites } from "@/features/favorites/actions";
@@ -42,11 +42,19 @@ export default function FavoritesPage() {
     }
 
     const fetchFavorites = async () => {
-      const result = await getFavorites();
-      if (result.success) {
-        setFavorites(result.favorites);
+      try {
+        const result = await getFavorites();
+        if (result.success) {
+          setFavorites(result.favorites);
+        } else {
+          setFavorites([]);
+        }
+      } catch (error) {
+        console.error("Erreur:", error);
+        setFavorites([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchFavorites();
@@ -70,7 +78,7 @@ export default function FavoritesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Mes favoris</h1>
           </div>
           <p className="text-gray-500 mt-1">
-            {favorites.length} établissements dans vos favoris
+            {favorites.length} établissement{favorites.length > 1 ? "s" : ""} dans vos favoris
           </p>
         </div>
 
@@ -145,7 +153,11 @@ export default function FavoritesPage() {
                         <span>{reviewCount} avis</span>
                       </div>
                       <div className="mt-3 text-xs text-gray-400">
-                        Ajouté le {new Date(fav.createdAt).toLocaleDateString()}
+                        Ajouté le {new Date(fav.createdAt).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
                       </div>
                     </div>
                   </Link>
