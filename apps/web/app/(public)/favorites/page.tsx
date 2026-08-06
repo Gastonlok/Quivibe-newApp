@@ -9,8 +9,10 @@ import Image from "next/image";
 import { getFavorites } from "@/features/favorites/actions";
 import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 
+// ✅ Corriger le type FavoritePlace
 interface FavoritePlace {
-  id: string;
+  userId: string;
+  placeId: string;
   place: {
     id: string;
     name: string;
@@ -44,8 +46,27 @@ export default function FavoritesPage() {
     const fetchFavorites = async () => {
       try {
         const result = await getFavorites();
-        if (result.success) {
-          setFavorites(result.favorites);
+        if (result.success && result.favorites) {
+          // ✅ S'assurer que les données sont correctement typées
+          const formattedFavorites = result.favorites.map((fav: any) => ({
+            userId: fav.userId,
+            placeId: fav.placeId,
+            place: {
+              id: fav.place.id,
+              name: fav.place.name,
+              slug: fav.place.slug,
+              description: fav.place.description,
+              address: fav.place.address,
+              neighborhood: fav.place.neighborhood,
+              priceRange: fav.place.priceRange,
+              averageRating: fav.place.averageRating || null,
+              media: fav.place.media || [],
+              categories: fav.place.categories || [],
+              reviews: fav.place.reviews || [],
+            },
+            createdAt: fav.createdAt,
+          }));
+          setFavorites(formattedFavorites);
         } else {
           setFavorites([]);
         }
@@ -110,7 +131,7 @@ export default function FavoritesPage() {
 
               return (
                 <div
-                  key={fav.id}
+                  key={fav.placeId}
                   className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all group"
                 >
                   <Link href={`/places/${place.slug}`}>

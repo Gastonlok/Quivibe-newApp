@@ -1,0 +1,6 @@
+{
+  "from": "onboarding@resend.dev",
+  "to": "lokangagaston@gmail.com",
+  "subject": "Test Direct API",
+  "html": "<p>Test direct depuis l'API Resend</p>"
+}

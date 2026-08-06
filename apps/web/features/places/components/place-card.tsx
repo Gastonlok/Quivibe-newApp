@@ -17,6 +17,7 @@ interface PlaceCardProps {
     categories: { category: { name: string } }[];
     priceRange: number;
     reviews?: { rating: number }[];
+    isFavorite?: boolean; // ✅ Ajouter cette propriété
   };
 }
 
@@ -55,9 +56,13 @@ export function PlaceCard({ place }: PlaceCardProps) {
             <span className="text-white text-xs font-medium">{category}</span>
           </div>
 
-          {/* ✅ Bouton favoris */}
+          {/* ✅ Bouton favoris avec état initial */}
           <div className="absolute top-3 left-3">
-            <FavoriteButton placeId={place.id} size="sm" />
+            <FavoriteButton
+              placeId={place.id}
+              size="sm"
+              initialFavorite={place.isFavorite}
+            />
           </div>
         </div>
 

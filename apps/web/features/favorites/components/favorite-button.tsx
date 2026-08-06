@@ -11,12 +11,18 @@ interface FavoriteButtonProps {
   placeId: string;
   className?: string;
   size?: "sm" | "md" | "lg";
+  initialFavorite?: boolean; // ✅ Ajouter cette prop
 }
 
-export function FavoriteButton({ placeId, className = "", size = "md" }: FavoriteButtonProps) {
+export function FavoriteButton({
+  placeId,
+  className = "",
+  size = "md",
+  initialFavorite = false
+}: FavoriteButtonProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(initialFavorite);
   const [loading, setLoading] = useState(false);
 
   const sizeClasses = {
@@ -31,14 +37,19 @@ export function FavoriteButton({ placeId, className = "", size = "md" }: Favorit
     lg: "w-6 h-6",
   };
 
-  // Vérifier l'état initial
+  // ✅ Mettre à jour si initialFavorite change
   useEffect(() => {
-    if (status === "authenticated" && placeId) {
+    setIsFavorited(initialFavorite);
+  }, [initialFavorite]);
+
+  // ✅ Vérifier l'état si non connecté
+  useEffect(() => {
+    if (status === "authenticated" && !initialFavorite) {
       isFavorite(placeId).then((result) => {
-        setIsFavorited(result.isFavorite);
+        setIsFavorited(result);
       });
     }
-  }, [placeId, status]);
+  }, [placeId, status, initialFavorite]);
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
