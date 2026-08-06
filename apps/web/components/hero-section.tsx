@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowRight, Star, MapPin, Users } from "lucide-react";
+import { Star, MapPin, Users, Utensils } from "lucide-react";
 
 export function HeroSection() {
   return (
@@ -16,7 +16,7 @@ export function HeroSection() {
             transition={{ duration: 0.6 }}
           >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-100 rounded-full mb-6">
-              <span className="text-xs font-medium text-primary-700">🔥 Kinshasa</span>
+              <span className="text-xs font-medium text-primary-700">🇨🇩 Kinshasa</span>
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
               Découvrez les lieux
@@ -59,53 +59,85 @@ export function HeroSection() {
             </div>
           </motion.div>
 
-          {/* Images */}
+          {/* Images - Drapeau RDC + Restaurants + Plats */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="relative"
           >
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Colonne gauche */}
+              <div className="space-y-3">
+                {/* ✅ Drapeau de la RDC */}
                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg">
                   <Image
-                    src="https://picsum.photos/seed/restaurant1/400/300"
+                    src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg/1280px-Flag_of_the_Democratic_Republic_of_the_Congo.svg.png"
+                    alt="Drapeau de la République Démocratique du Congo"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 text-white text-xs font-medium bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-2">
+                    <span>🇨🇩</span>
+                    RDC
+                  </div>
+                </div>
+                {/* Plat gastronomique */}
+                <div className="relative h-32 rounded-2xl overflow-hidden shadow-lg">
+                  <Image
+                    src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop"
+                    alt="Cuisine gastronomique"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  <div className="absolute bottom-2 left-2 text-white text-xs font-medium bg-black/50 px-2 py-0.5 rounded-full">
+                    🍽️ Gastronomie
+                  </div>
+                </div>
+              </div>
+
+              {/* Colonne droite */}
+              <div className="space-y-3 pt-8">
+                {/* Restaurant chic */}
+                <div className="relative h-32 rounded-2xl overflow-hidden shadow-lg">
+                  <Image
+                    src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&h=600&fit=crop"
                     alt="Restaurant chic"
                     fill
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  <div className="absolute bottom-2 left-2 text-white text-xs font-medium bg-black/50 px-2 py-0.5 rounded-full">
+                    🏙️ Restaurant
+                  </div>
                 </div>
-                <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg">
-                  <Image
-                    src="https://picsum.photos/seed/lounge/400/400"
-                    alt="Lounge bar"
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                </div>
-              </div>
-              <div className="space-y-4 pt-8">
-                <div className="relative h-64 rounded-2xl overflow-hidden shadow-lg">
-                  <Image
-                    src="https://picsum.photos/seed/rooftop/400/400"
-                    alt="Rooftop"
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                </div>
+                {/* Plat traditionnel */}
                 <div className="relative h-48 rounded-2xl overflow-hidden shadow-lg">
                   <Image
-                    src="https://picsum.photos/seed/event/400/300"
-                    alt="Événement"
+                    src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=600&fit=crop"
+                    alt="Cuisine traditionnelle"
                     fill
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  <div className="absolute bottom-3 left-3 text-white text-xs font-medium bg-black/50 px-2 py-1 rounded-full">
+                    🌍 Cuisine locale
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Badge flottant */}
+            <div className="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-xl p-3 flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                <Utensils className="w-5 h-5 text-primary-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">6+ lieux</p>
+                <p className="text-xs text-gray-500">À découvrir</p>
               </div>
             </div>
           </motion.div>

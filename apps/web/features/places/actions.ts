@@ -383,7 +383,6 @@ export async function getPlaceEvents(placeId: string) {
 // ============================================
 // TOP RATED PLACES
 // ============================================
-
 export async function getTopRatedPlaces() {
   try {
     const session = await auth();
@@ -421,7 +420,7 @@ export async function getTopRatedPlaces() {
           _count: "desc",
         },
       },
-      take: 6,
+      take: 12, // Prendre 12 pour le carrousel
     });
 
     return places.map((place) => ({
@@ -476,7 +475,7 @@ export async function getRecommendations() {
       orderBy: {
         createdAt: "desc",
       },
-      take: 6,
+      take: 12, // Prendre 12 pour le carrousel
     });
 
     return places.map((place) => ({

@@ -17,12 +17,17 @@ interface PlaceCardProps {
     categories: { category: { name: string } }[];
     priceRange: number;
     reviews?: { rating: number }[];
-    isFavorite?: boolean; // ✅ Ajouter cette propriété
+    isFavorite?: boolean;
   };
 }
 
 export function PlaceCard({ place }: PlaceCardProps) {
+  // ✅ Prendre la première image du restaurant (ou une image de plat)
   const mainImage = place.media[0]?.url || "/images/placeholder.jpg";
+
+  // ✅ Prendre une image de plat si disponible (2ème image ou plus)
+  const foodImage = place.media[1]?.url || place.media[0]?.url || "/images/placeholder.jpg";
+
   const category = place.categories[0]?.category.name || "Établissement";
   const priceLabels = ["€", "€€", "€€€", "€€€€"];
   const reviewCount = place.reviews?.length || 0;
@@ -41,6 +46,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
+          {/* Badge de note */}
           {place.averageRating !== null && (
             <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
               <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -51,12 +57,23 @@ export function PlaceCard({ place }: PlaceCardProps) {
             </div>
           )}
 
-          <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5">
-            <Utensils className="w-3.5 h-3.5 text-white" />
-            <span className="text-white text-xs font-medium">{category}</span>
+          {/* Miniature plat en bas à gauche */}
+          <div className="absolute bottom-3 left-3 flex items-center gap-2">
+            <div className="relative w-10 h-10 rounded-lg overflow-hidden border-2 border-white shadow-md">
+              <Image
+                src={foodImage}
+                alt="Plat"
+                fill
+                className="object-cover"
+              />
+            </div>
+            <div className="bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <Utensils className="w-3.5 h-3.5 text-white" />
+              <span className="text-white text-xs font-medium">{category}</span>
+            </div>
           </div>
 
-          {/* ✅ Bouton favoris avec état initial */}
+          {/* Bouton favoris */}
           <div className="absolute top-3 left-3">
             <FavoriteButton
               placeId={place.id}

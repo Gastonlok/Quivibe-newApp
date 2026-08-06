@@ -1,4 +1,3 @@
-// apps/web/next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -6,13 +5,24 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "res.cloudinary.com",
-        pathname: "/**", // Autorise tous les chemins sur Cloudinary
+        pathname: "/**",
       },
       {
         protocol: "https",
         hostname: "picsum.photos",
-        pathname: "/seed/**", // Autorise uniquement les images de seed
+        pathname: "/seed/**",
+      },
+      // ✅ Ajouter Wikimedia Commons pour le drapeau
+      {
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+        pathname: "/**",
       },
     ],
   },
