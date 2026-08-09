@@ -1,66 +1,120 @@
-import { listPlacesAction } from "@/features/places/actions";
+// apps/web/app/(public)/page.tsx
+import { Suspense } from "react";
 import { PlaceCard } from "@/features/places/components/place-card";
+import { SearchBarAutocomplete } from "@/features/places/components/search-bar-autocomplete";
+import { Filters } from "@/features/places/components/filters";
+import { getPlaces, getTopRatedPlaces, getRecommendations } from "@/features/places/actions";
+import { HeroSection } from "@/components/hero-section";
+import { OwnerCTA } from "@/components/owner-cta";
+import { AnimatedSection } from "@/components/animated-section";
+import { CarouselSection, CarouselSkeleton } from "@/components/carousel-section";
+import { Sparkles, Trophy, Star } from "lucide-react";
 
-type SearchParams = {
-  search?: string;
-  neighborhood?: string;
-  priceRange?: string;
-  page?: string;
-};
+// ✅ Forcer le rendu dynamique pour éviter les erreurs de prerendering
+export const dynamic = 'force-dynamic';
 
-export default async function DiscoverPage({
+export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<{ search?: string; category?: string; neighborhood?: string }>;
 }) {
   const params = await searchParams;
+  const isSearching = params.search || params.category || params.neighborhood;
 
-  const result = await listPlacesAction({
-    search: params.search,
-    neighborhood: params.neighborhood,
-    priceRange: params.priceRange,
-    page: params.page,
-  });
-
-  if (!result.success) {
-    return <p className="px-6 py-10 text-red-600">{result.error}</p>;
-  }
-
-  const { places, total } = result.data;
+  const [places, topRated, recommendations] = await Promise.all([
+    getPlaces({
+      search: params.search,
+      category: params.category,
+      neighborhood: params.neighborhood,
+    }),
+    getTopRatedPlaces(),
+    getRecommendations(),
+  ]);
 
   return (
-    <main className="px-6 py-10 flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Où sort-on ce soir ?</h1>
-        <p className="text-gray-600 text-sm mt-1">
-          {total} établissement{total > 1 ? "s" : ""} à découvrir à Kinshasa
-        </p>
-      </div>
+    <>
+      <HeroSection />
+      <div className="container mx-auto px-4 py-8">
+        <Suspense fallback={<div className="h-12 bg-gray-100 rounded-lg animate-pulse" />}>
+          <SearchBarAutocomplete />
+        </Suspense>
 
-      <form className="flex gap-2" method="GET">
-        <input
-          type="text"
-          name="search"
-          defaultValue={params.search}
-          placeholder="Rechercher un lieu, une ambiance..."
-          className="border rounded-md px-3 py-2 flex-1"
-        />
-        <button type="submit" className="border rounded-md px-4 py-2">
-          Rechercher
-        </button>
-      </form>
-
-      {places.length === 0 ? (
-        <p className="text-gray-600">
-          Aucun établissement ne correspond à ta recherche pour le moment.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {places.map((place) => (
-            <PlaceCard key={place.id} place={place} />
-          ))}
+        <div className="mt-4 mb-8 flex flex-wrap items-center gap-4">
+          <Suspense fallback={<div className="h-10 w-48 bg-gray-100 rounded-lg animate-pulse" />}>
+            <Filters />
+          </Suspense>
+          {!isSearching && (
+            <span className="text-sm text-gray-500">
+              {places.length} établissements à découvrir
+            </span>
+          )}
         </div>
-      )}
-    </main>
+
+        {isSearching ? (
+          <Suspense fallback={<CarouselSkeleton />}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {places.map((place) => (
+                <PlaceCard key={place.id} place={place} />
+              ))}
+            </div>
+            {places.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Aucun résultat trouvé</p>
+              </div>
+            )}
+          </Suspense>
+        ) : (
+          <>
+            {topRated.length > 0 && (
+              <AnimatedSection delay={0.2}>
+                <div className="mt-12">
+                  <CarouselSection
+                    title="Les plus cotés"
+                    icon={<Trophy className="w-6 h-6 text-yellow-500" />}
+                    items={topRated}
+                    viewAllLink="/top-rated"
+                    itemsPerView={4}
+                  />
+                </div>
+              </AnimatedSection>
+            )}
+
+            {recommendations.length > 0 && (
+              <AnimatedSection delay={0.3}>
+                <div className="mt-12">
+                  <CarouselSection
+                    title="Nos recommandations"
+                    icon={<Sparkles className="w-6 h-6 text-primary-500" />}
+                    items={recommendations}
+                    viewAllLink="/recommendations"
+                    itemsPerView={4}
+                  />
+                </div>
+              </AnimatedSection>
+            )}
+
+            {places.length > 0 && (
+              <AnimatedSection delay={0.4}>
+                <div className="mt-12">
+                  <CarouselSection
+                    title="Nouveautés"
+                    icon={<Star className="w-6 h-6 text-blue-500" />}
+                    items={places.slice(0, 12)}
+                    viewAllLink="/discover"
+                    itemsPerView={4}
+                  />
+                </div>
+              </AnimatedSection>
+            )}
+
+            <AnimatedSection delay={0.5}>
+              <div className="mt-16">
+                <OwnerCTA />
+              </div>
+            </AnimatedSection>
+          </>
+        )}
+      </div>
+    </>
   );
 }

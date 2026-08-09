@@ -5,6 +5,10 @@ import {
   MessageSquare, AlertTriangle, Activity
 } from "lucide-react";
 
+// ✅ Ajouter le type pour les couleurs
+type ColorKey = "blue" | "green" | "yellow" | "purple" | "red";
+type ActionColorKey = "primary" | "yellow" | "red";
+
 export default function AdminDashboard() {
   const stats = {
     totalUsers: 1250,
@@ -63,8 +67,23 @@ export default function AdminDashboard() {
   );
 }
 
-function AdminStatCard({ icon: Icon, label, value, change, color, subtitle }: any) {
-  const colors = {
+// ✅ Composant avec typage explicite
+function AdminStatCard({
+  icon: Icon,
+  label,
+  value,
+  change,
+  color,
+  subtitle
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  change: string;
+  color: ColorKey;
+  subtitle?: string;
+}) {
+  const colors: Record<ColorKey, string> = {
     blue: "bg-blue-50 text-blue-600",
     green: "bg-green-50 text-green-600",
     yellow: "bg-yellow-50 text-yellow-600",
@@ -87,8 +106,21 @@ function AdminStatCard({ icon: Icon, label, value, change, color, subtitle }: an
   );
 }
 
-function QuickAction({ icon: Icon, label, count, color, href }: any) {
-  const colors = {
+// ✅ Composant avec typage explicite
+function QuickAction({
+  icon: Icon,
+  label,
+  count,
+  color,
+  href
+}: {
+  icon: React.ElementType;
+  label: string;
+  count: number;
+  color: ActionColorKey;
+  href: string;
+}) {
+  const colors: Record<ActionColorKey, string> = {
     primary: "bg-primary-50 hover:bg-primary-100 text-primary-600",
     yellow: "bg-yellow-50 hover:bg-yellow-100 text-yellow-600",
     red: "bg-red-50 hover:bg-red-100 text-red-600",

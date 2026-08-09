@@ -25,11 +25,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
+// ✅ Définir les types pour les couleurs
+type StatColorKey = "primary" | "green" | "yellow" | "blue" | "purple";
+
 export default function OwnerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [dateRange, setDateRange] = useState("7d");
 
-  // Données mock pour le dashboard
   const stats = {
     views: 1247,
     reservations: 48,
@@ -58,19 +60,15 @@ export default function OwnerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Barre de navigation du dashboard */}
       <DashboardNav />
 
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
           <DashboardSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-          {/* Contenu principal */}
           <div className="flex-1">
             {activeTab === "overview" && (
               <>
-                {/* En-tête avec statistiques */}
                 <div className="mb-8">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -90,7 +88,6 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
 
-                {/* Cartes de statistiques */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                   <StatCard
                     icon={Eye}
@@ -129,9 +126,7 @@ export default function OwnerDashboard() {
                   />
                 </div>
 
-                {/* Graphique et activités */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  {/* Graphique des réservations */}
                   <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-gray-900">Activité récente</h3>
@@ -160,7 +155,6 @@ export default function OwnerDashboard() {
                     </div>
                   </div>
 
-                  {/* Plats populaires */}
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                     <h3 className="font-semibold text-gray-900 mb-4">Plats populaires</h3>
                     <div className="space-y-4">
@@ -179,9 +173,7 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
 
-                {/* Réservations et avis */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Réservations à venir */}
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-gray-900">Réservations à venir</h3>
@@ -205,7 +197,6 @@ export default function OwnerDashboard() {
                     </div>
                   </div>
 
-                  {/* Derniers avis */}
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-gray-900">Derniers avis</h3>
@@ -247,8 +238,6 @@ export default function OwnerDashboard() {
     </div>
   );
 }
-
-// Composants du dashboard
 
 function DashboardNav() {
   return (
@@ -322,8 +311,21 @@ function DashboardSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
   );
 }
 
-function StatCard({ icon: Icon, label, value, change, color }: any) {
-  const colors = {
+// ✅ Composant StatCard avec typage correct
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  change,
+  color
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  change: string;
+  color: StatColorKey;
+}) {
+  const colors: Record<StatColorKey, string> = {
     primary: "bg-primary-50 text-primary-600",
     green: "bg-green-50 text-green-600",
     yellow: "bg-yellow-50 text-yellow-600",
@@ -347,7 +349,7 @@ function StatCard({ icon: Icon, label, value, change, color }: any) {
   );
 }
 
-// Pages de gestion (à implémenter)
+// Pages de gestion
 function MenuManagement() {
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">

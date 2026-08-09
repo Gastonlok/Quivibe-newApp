@@ -1,170 +1,175 @@
+// apps/web/features/places/components/create-place-form.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  createPlaceSchema,
-  type CreatePlaceInput,
-} from "@/features/places/schema";
+import { Loader2 } from "lucide-react";
 import { createPlaceAction } from "@/features/places/actions";
 
-type Category = { id: string; name: string };
+interface CreatePlaceFormProps {
+  onSuccess?: () => void;
+   categories?: { id: string; name: string; slug: string }[];
+}
 
-export function CreatePlaceForm({ categories }: { categories: Category[] }) {
+export function CreatePlaceForm({ onSuccess }: CreatePlaceFormProps) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<CreatePlaceInput>({
-    resolver: zodResolver(createPlaceSchema),
-    defaultValues: { priceRange: 2, categoryIds: [] },
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    address: "",
+    neighborhood: "",
+    priceRange: "2",
+    phone: "",
   });
 
-  const onSubmit = async (values: CreatePlaceInput) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
     setServerError(null);
 
-    const result = await createPlaceAction(values);
-    if (!result.success) {
-      setServerError(result.error);
-      return;
-    }
+    try {
+      const result = await createPlaceAction({
+        ...formData,
+        priceRange: parseInt(formData.priceRange),
+      });
 
-    router.push(`/etablissements/${result.data.slug}`);
-    router.refresh();
+      if (!result.success) {
+        // ✅ Correction ici
+        setServerError(result.error || "Une erreur est survenue");
+        return;
+      }
+
+      if (onSuccess) onSuccess();
+      router.refresh();
+    } catch (error) {
+      setServerError("Une erreur est survenue");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const neighborhoods = [
+    "Gombe",
+    "Kinshasa",
+    "Lemba",
+    "Limete",
+    "Matete",
+    "Mont Ngafula",
+    "Ndjili",
+    "Selembao",
+    "Kalamu",
+    "Bandalungwa",
+  ];
+
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="flex flex-col gap-4 w-full max-w-lg"
-    >
-      <div className="flex flex-col gap-1">
-        <label htmlFor="name" className="text-sm font-medium">
-          Nom de l&apos;établissement
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {serverError && (
+        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+          {serverError}
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Nom de l'établissement *
         </label>
-        <input id="name" className="border rounded-md px-3 py-2" {...register("name")} />
-        {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+        <input
+          type="text"
+          required
+          placeholder="Le Jardin des Saveurs"
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="description" className="text-sm font-medium">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Description
         </label>
         <textarea
-          id="description"
-          rows={4}
-          className="border rounded-md px-3 py-2"
-          {...register("description")}
+          rows={3}
+          placeholder="Décrivez l'établissement..."
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
         />
-        {errors.description && (
-          <p className="text-sm text-red-600">{errors.description.message}</p>
-        )}
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="address" className="text-sm font-medium">
-          Adresse
-        </label>
-        <input id="address" className="border rounded-md px-3 py-2" {...register("address")} />
-        {errors.address && (
-          <p className="text-sm text-red-600">{errors.address.message}</p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="neighborhood" className="text-sm font-medium">
-          Quartier
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Adresse *
         </label>
         <input
-          id="neighborhood"
-          className="border rounded-md px-3 py-2"
-          {...register("neighborhood")}
+          type="text"
+          required
+          placeholder="12 Avenue de la Gombe"
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.address}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
         />
-        {errors.neighborhood && (
-          <p className="text-sm text-red-600">{errors.neighborhood.message}</p>
-        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="latitude" className="text-sm font-medium">
-            Latitude
-          </label>
-          <input
-            id="latitude"
-            type="number"
-            step="any"
-            className="border rounded-md px-3 py-2"
-            {...register("latitude")}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="longitude" className="text-sm font-medium">
-            Longitude
-          </label>
-          <input
-            id="longitude"
-            type="number"
-            step="any"
-            className="border rounded-md px-3 py-2"
-            {...register("longitude")}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="priceRange" className="text-sm font-medium">
-          Budget (1 = économique, 4 = premium)
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Quartier
         </label>
         <select
-          id="priceRange"
-          className="border rounded-md px-3 py-2"
-          {...register("priceRange")}
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.neighborhood}
+          onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
         >
-          <option value={1}>$</option>
-          <option value={2}>$$</option>
-          <option value={3}>$$$</option>
-          <option value={4}>$$$$</option>
+          <option value="">Sélectionner un quartier</option>
+          {neighborhoods.map((hood) => (
+            <option key={hood} value={hood}>{hood}</option>
+          ))}
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="phone" className="text-sm font-medium">
-          Téléphone (optionnel)
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Budget
         </label>
-        <input id="phone" className="border rounded-md px-3 py-2" {...register("phone")} />
+        <select
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.priceRange}
+          onChange={(e) => setFormData({ ...formData, priceRange: e.target.value })}
+        >
+          <option value="1">€ (Bon marché)</option>
+          <option value="2">€€ (Moyen)</option>
+          <option value="3">€€€ (Cher)</option>
+          <option value="4">€€€€ (Très cher)</option>
+        </select>
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium mb-1">Catégories</legend>
-        {categories.map((category) => (
-          <label key={category.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              value={category.id}
-              {...register("categoryIds")}
-            />
-            {category.name}
-          </label>
-        ))}
-        {errors.categoryIds && (
-          <p className="text-sm text-red-600">{errors.categoryIds.message}</p>
-        )}
-      </fieldset>
-
-      {serverError && <p className="text-sm text-red-600">{serverError}</p>}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Téléphone
+        </label>
+        <input
+          type="tel"
+          placeholder="+243 812 345 678"
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.phone}
+          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+        />
+      </div>
 
       <button
         type="submit"
-        disabled={isSubmitting}
-        className="bg-black text-white rounded-md px-4 py-2 disabled:opacity-50"
+        disabled={loading}
+        className="w-full py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
       >
-        {isSubmitting ? "Création..." : "Créer ma fiche"}
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Création...
+          </>
+        ) : (
+          "Créer l'établissement"
+        )}
       </button>
     </form>
   );

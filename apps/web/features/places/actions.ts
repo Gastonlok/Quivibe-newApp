@@ -1,4 +1,3 @@
-// apps/web/features/places/actions.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -68,11 +67,13 @@ const getPlacesSchema = z.object({
   neighborhood: z.string().optional(),
 });
 
+// ✅ AJOUTER category dans listPlacesSchema
 const listPlacesSchema = z.object({
   search: z.string().optional(),
   neighborhood: z.string().optional(),
   priceRange: z.string().optional(),
   page: z.string().optional(),
+  category: z.string().optional(), // ✅ ICI
 });
 
 // ============================================
@@ -169,6 +170,17 @@ export async function listPlacesAction(
 
     if (validated.priceRange) {
       where.priceRange = { equals: parseInt(validated.priceRange) };
+    }
+
+    // ✅ Filtre par catégorie
+    if (validated.category) {
+      where.categories = {
+        some: {
+          category: {
+            slug: validated.category,
+          },
+        },
+      };
     }
 
     const [places, total] = await Promise.all([
@@ -380,9 +392,41 @@ export async function getPlaceEvents(placeId: string) {
   }
 }
 
+// CREATE PLACE ACTION
+export async function createPlaceAction(data: any) {
+  try {
+    const session = await auth();
+    if (!session || session.user?.role !== "ADMIN") {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const place = await prisma.place.create({
+      data: {
+        name: data.name,
+        slug: data.slug || data.name.toLowerCase().replace(/ /g, "-"),
+        description: data.description || "",
+        address: data.address,
+        neighborhood: data.neighborhood,
+        latitude: data.latitude || 0,
+        longitude: data.longitude || 0,
+        priceRange: data.priceRange || 2,
+        phone: data.phone || null,
+        ownerId: data.ownerId || session.user.id,
+        status: "APPROVED",
+      },
+    });
+
+    return { success: true, data: place };
+  } catch (error) {
+    console.error("Erreur createPlaceAction:", error);
+    return { success: false, error: "Erreur lors de la création" };
+  }
+}
+
 // ============================================
 // TOP RATED PLACES
 // ============================================
+
 export async function getTopRatedPlaces() {
   try {
     const session = await auth();
@@ -420,7 +464,7 @@ export async function getTopRatedPlaces() {
           _count: "desc",
         },
       },
-      take: 12, // Prendre 12 pour le carrousel
+      take: 12,
     });
 
     return places.map((place) => ({
@@ -475,7 +519,7 @@ export async function getRecommendations() {
       orderBy: {
         createdAt: "desc",
       },
-      take: 12, // Prendre 12 pour le carrousel
+      take: 12,
     });
 
     return places.map((place) => ({

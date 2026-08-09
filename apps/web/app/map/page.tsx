@@ -1,22 +1,24 @@
+// apps/web/app/map/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { MapPin, Search, X, Navigation, Layers, Maximize2 } from "lucide-react";
+import { useState } from "react";
+import NextDynamic from "next/dynamic";
+import { Search, X, Layers, Maximize2, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import Image from "next/image";
 
-// Import Leaflet
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-
-// Configuration des icônes Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
+// ✅ Importer la carte dynamiquement SANS SSR
+const DynamicMap = NextDynamic(
+  () => import("@/components/map/LeafletMap"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[600px] rounded-2xl overflow-hidden shadow-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
+        <div className="animate-pulse text-gray-400">Chargement de la carte...</div>
+      </div>
+    ),
+  }
+);
 
 // Données mock pour la carte
 const MOCK_PLACES = [
@@ -27,66 +29,12 @@ const MOCK_PLACES = [
   { id: 5, name: "Café de la Gare", lat: -4.340, lng: 15.334, category: "Café", rating: 4.2 },
 ];
 
+export const dynamic = 'force-dynamic';
+
 export default function MapPage() {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<L.Map | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<typeof MOCK_PLACES[0] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isMapReady, setIsMapReady] = useState(false);
 
-  // Initialisation de la carte
-  useEffect(() => {
-    if (!mapRef.current || map) return;
-
-    const mapInstance = L.map(mapRef.current, {
-      center: [-4.33, 15.32],
-      zoom: 13,
-      zoomControl: true,
-    });
-
-    // Tuiles OpenStreetMap
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(mapInstance);
-
-    // Ajouter les marqueurs
-    MOCK_PLACES.forEach((place) => {
-      const marker = L.marker([place.lat, place.lng])
-        .addTo(mapInstance)
-        .bindPopup(`
-          <div class="p-2">
-            <h4 class="font-bold text-gray-900">${place.name}</h4>
-            <p class="text-sm text-gray-600">${place.category}</p>
-            <p class="text-sm text-yellow-500">⭐ ${place.rating}</p>
-            <a href="/places/${place.id}" class="text-primary-500 text-sm hover:underline">Voir détails</a>
-          </div>
-        `);
-
-      marker.on("click", () => {
-        setSelectedPlace(place);
-      });
-    });
-
-    setMap(mapInstance);
-    setIsMapReady(true);
-
-    return () => {
-      mapInstance.remove();
-    };
-  }, []);
-
-  // Zoom sur un lieu sélectionné
-  useEffect(() => {
-    if (map && selectedPlace) {
-      map.setView([selectedPlace.lat, selectedPlace.lng], 16, {
-        animate: true,
-        duration: 1,
-      });
-    }
-  }, [map, selectedPlace]);
-
-  // Filtrer les lieux
   const filteredPlaces = MOCK_PLACES.filter((place) =>
     place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     place.category.toLowerCase().includes(searchQuery.toLowerCase())
@@ -94,7 +42,6 @@ export default function MapPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white py-6">
         <div className="container mx-auto px-4">
           <h1 className="text-2xl md:text-3xl font-bold">Carte interactive</h1>
@@ -104,10 +51,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Contenu principal */}
       <div className="container mx-auto px-4 py-4">
         <div className="relative">
-          {/* Barre de recherche */}
           <div className="absolute top-4 left-4 z-20 w-full max-w-md">
             <div className="relative">
               <input
@@ -129,13 +74,12 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Carte */}
-          <div
-            ref={mapRef}
-            className="w-full h-[600px] rounded-2xl overflow-hidden shadow-lg border border-gray-200"
+          <DynamicMap
+            places={MOCK_PLACES}
+            onSelectPlace={setSelectedPlace}
+            selectedPlace={selectedPlace}
           />
 
-          {/* Légende */}
           <div className="absolute bottom-4 left-4 z-20 bg-white rounded-xl shadow-lg p-3 border border-gray-100">
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-1.5">
@@ -153,24 +97,16 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Contrôles */}
           <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
-            <button
-              onClick={() => map?.setView([-4.33, 15.32], 13)}
-              className="bg-white rounded-lg shadow-lg p-2 hover:bg-gray-50 transition-colors"
-            >
+            <button className="bg-white rounded-lg shadow-lg p-2 hover:bg-gray-50 transition-colors">
               <Layers className="w-5 h-5 text-gray-600" />
             </button>
-            <button
-              onClick={() => map?.zoomIn()}
-              className="bg-white rounded-lg shadow-lg p-2 hover:bg-gray-50 transition-colors"
-            >
+            <button className="bg-white rounded-lg shadow-lg p-2 hover:bg-gray-50 transition-colors">
               <Maximize2 className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
 
-        {/* Liste des lieux (mobile) */}
         <div className="mt-4 overflow-x-auto pb-2 flex gap-3 md:hidden">
           {filteredPlaces.map((place) => (
             <button
@@ -187,7 +123,6 @@ export default function MapPage() {
           ))}
         </div>
 
-        {/* Infos du lieu sélectionné */}
         <AnimatePresence>
           {selectedPlace && (
             <motion.div

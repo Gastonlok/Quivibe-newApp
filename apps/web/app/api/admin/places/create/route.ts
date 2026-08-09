@@ -1,4 +1,3 @@
-// apps/web/app/api/admin/places/create/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -35,8 +34,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Créer le slug
-    const slug = name
+    // ✅ Utiliser let au lieu de const
+    let slug = name
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -51,13 +50,12 @@ export async function POST(request: Request) {
     if (existingPlace) {
       // Si le slug existe, ajouter un timestamp
       const timestamp = Date.now().toString().slice(-6);
-      slug = `${slug}-${timestamp}`;
+      slug = `${slug}-${timestamp}`; // ✅ Maintenant possible avec let
     }
 
     // Déterminer le propriétaire
     let ownerIdToUse = ownerId;
     if (!ownerIdToUse) {
-      // Si aucun propriétaire n'est spécifié, utiliser l'admin
       const adminUser = await prisma.user.findUnique({
         where: { id: session.user.id },
       });
