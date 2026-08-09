@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { getPlaceBySlugAction } from "@/features/places/actions";
-import { isFavoriteAction } from "@/features/favorites/actions";
+import { getPlaceBySlug } from "@/features/places/actions";
+import { listFavoritesAction } from "@/features/favorites/actions";
 import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { auth } from "@/lib/auth";
@@ -18,14 +18,22 @@ export default async function PlacePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const place = await getPlaceBySlugAction(slug);
+  const place = await getPlaceBySlug(slug);
 
   if (!place) {
     notFound();
   }
 
   const session = await auth();
-  const isFavorite = await isFavoriteAction(place.id);
+
+  // ✅ Récupérer la liste des favoris de l'utilisateur
+  const favorites = await listFavoritesAction();
+
+  // ✅ Vérifier si ce lieu est dans les favoris
+  const isFavorite = Array.isArray(favorites) && favorites.some(
+    (fav) => fav.placeId === place.id
+  );
+
   const hasAlreadyReviewed = session?.user
     ? place.reviews.some((review) => review.authorId === session.user.id)
     : false;
@@ -40,11 +48,10 @@ export default async function PlacePage({
             {place.categories.map((c) => c.category.name).join(", ")}
           </p>
         </div>
-        <FavoriteButton
-          placeId={place.id}
-          initialIsFavorite={isFavorite}
-          isAuthenticated={!!session?.user}
-        />
+      <FavoriteButton
+  placeId={place.id}
+  initialFavorite={isFavorite}
+/>
       </div>
 
       <p className="text-gray-800">{place.description}</p>
