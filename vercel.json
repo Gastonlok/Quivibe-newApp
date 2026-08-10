@@ -2,13 +2,5 @@
   "buildCommand": "cd apps/web && npm run build",
   "installCommand": "cd apps/web && npm install",
   "framework": "nextjs",
-  "outputDirectory": "apps/web/.next",
-  "env": {
-    "AUTH_SECRET": "",
-    "NEXTAUTH_SECRET": "",
-    "NEXTAUTH_URL": "",
-    "RESEND_API_KEY": "",
-    "RESEND_FROM_EMAIL": "",
-    "NEXT_PUBLIC_APP_URL": ""
-  }
+  "outputDirectory": "apps/web/.next"
 }
