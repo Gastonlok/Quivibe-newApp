@@ -47,10 +47,12 @@ export default async function PlacePage({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{place.name}</h1>
-          <p className="text-gray-600 text-sm mt-1">
-            {place.neighborhood} · {PRICE_LABELS[place.priceRange]} ·{" "}
-            {place.categories.map((c) => c.category.name).join(", ")}
-          </p>
+         <p className="text-gray-600 text-sm mt-1">
+  {place.neighborhood} · {PRICE_LABELS[place.priceRange]} ·{" "}
+  {place.categories
+    .map((c: { category: { name: string } }) => c.category.name)
+    .join(", ")}
+</p>
         </div>
       <FavoriteButton
   placeId={place.id}
