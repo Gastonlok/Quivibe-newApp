@@ -1,7 +1,6 @@
 {
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
   "framework": "nextjs",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm run build",
-  "outputDirectory": ".next",
-    "rootDirectory": "apps/web"
+  "outputDirectory": ".next"
 }
