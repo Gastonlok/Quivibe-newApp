@@ -76,15 +76,24 @@ export default async function PlacePage({
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {place.reviews.map((review) => (
-              <li key={review.id} className="border rounded-lg p-3">
-                <p className="text-sm font-medium">
-                  {review.author.name} — {review.rating}/5
-                </p>
-                <p className="text-sm text-gray-700 mt-1">{review.comment}</p>
-              </li>
-            ))}
-          </ul>
+  {place.reviews.map(
+    (review: {
+      id: string;
+      author: {
+        name: string;
+      };
+      rating: number;
+    }) => (
+      <li key={review.id} className="border rounded-lg p-3">
+        <p className="text-sm font-medium">
+          {review.author.name} — {review.rating}/5
+        </p>
+
+        {/* reste du contenu de la review */}
+      </li>
+    )
+  )}
+</ul>
         )}
 
         {session?.user && !hasAlreadyReviewed && (
