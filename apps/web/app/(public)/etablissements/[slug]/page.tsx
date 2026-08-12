@@ -4,6 +4,7 @@ import { listFavoritesAction } from "@/features/favorites/actions";
 import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { auth } from "@/lib/auth";
+import type { Prisma } from "@prisma/client";
 
 const PRICE_LABELS: Record<number, string> = {
   1: "$",
@@ -35,8 +36,11 @@ export default async function PlacePage({
   );
 
   const hasAlreadyReviewed = session?.user
-    ? place.reviews.some((review) => review.authorId === session.user.id)
-    : false;
+   ? place.reviews.some(
+      (review: { authorId: string }) =>
+        review.authorId === session.user.id
+    )
+   : false;
 
   return (
     <main className="px-6 py-10 flex flex-col gap-6 max-w-2xl mx-auto">
