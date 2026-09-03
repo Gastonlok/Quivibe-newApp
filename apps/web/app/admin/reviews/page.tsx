@@ -19,6 +19,7 @@ interface Review {
     name: string;
     slug: string;
   };
+  _count: { reports: number };
 }
 
 export default function AdminReviewsPage() {
@@ -172,6 +173,7 @@ export default function AdminReviewsPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       Sur <strong>{review.place.name}</strong>
                     </p>
+                    {review._count.reports > 0 && <p className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-red-700"><AlertCircle className="h-4 w-4" />{review._count.reports} signalement{review._count.reports > 1 ? "s" : ""} en attente</p>}
                   </div>
                 </div>
 

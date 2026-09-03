@@ -13,6 +13,7 @@ export async function GET() {
       include: {
         author: { select: { name: true, email: true } },
         place: { select: { name: true, slug: true } },
+        _count: { select: { reports: { where: { status: "PENDING" } } } },
       },
       orderBy: { createdAt: "desc" },
     });

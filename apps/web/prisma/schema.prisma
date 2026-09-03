@@ -33,6 +33,7 @@ model User {
   collaborations PlaceCollaborator[]
   reviewResponses OwnerReviewResponse[]
   waitlistEntries ReservationWaitlist[]
+  reviewReports ReviewReport[]
 
   @@map("users")
 }
@@ -187,10 +188,27 @@ model Review {
   place    Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
   placeId  String
   response OwnerReviewResponse?
+  reports  ReviewReport[]
 
   @@index([placeId, status, createdAt])
   @@unique([authorId, placeId])
   @@map("reviews")
+}
+
+model ReviewReport {
+  id         String   @id @default(cuid())
+  reason     String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  reviewId   String
+  reporterId String
+
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporter User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, reporterId])
+  @@index([status, createdAt])
+  @@map("review_reports")
 }
 
 model OwnerReviewResponse {

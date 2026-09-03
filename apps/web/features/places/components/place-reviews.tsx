@@ -1,6 +1,7 @@
 // apps/web/features/places/components/place-reviews.tsx
 import { Star } from "lucide-react";
 import { getPlaceReviews } from "../actions";
+import { ReviewReportButton } from "@/features/reviews/components/review-report-button";
 
 export async function PlaceReviews({ placeId }: { placeId: string }) {
   const reviews = await getPlaceReviews(placeId);
@@ -55,6 +56,7 @@ export async function PlaceReviews({ placeId }: { placeId: string }) {
                 <p className="mt-1">{review.response.body}</p>
               </div>
             )}
+            <div className="mt-3"><ReviewReportButton reviewId={review.id} /></div>
           </div>
         ))}
       </div>

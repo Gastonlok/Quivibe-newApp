@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Home, MapPin, Star, UtensilsCrossed } from "lucide-react";
+import { BadgeCheck, ChevronRight, Home, MapPin, Star, UtensilsCrossed } from "lucide-react";
 import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 
 interface PlaceHeaderProps {
@@ -15,6 +15,7 @@ interface PlaceHeaderProps {
     isFavorite: boolean;
     categories: { category: { name: string } }[];
     reviews: { rating: number }[];
+    owner: { ownerVerifiedAt: Date | null };
   };
 }
 
@@ -34,6 +35,7 @@ export function PlaceHeader({ place }: PlaceHeaderProps) {
       <div className="mt-5 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">{place.name}</h1>
+          {place.owner.ownerVerifiedAt && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1 text-xs font-extrabold text-primary-800"><BadgeCheck className="h-4 w-4" />Propriétaire vérifié</p>}
           <div className="mt-3 space-y-2 text-sm text-gray-600 sm:text-base">
             <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary-700" />{place.address}, {place.neighborhood}</p>
             <p className="flex items-center gap-2"><UtensilsCrossed className="h-5 w-5 shrink-0 text-primary-700" />{categoryNames || "Restaurant"} · Budget {"$".repeat(Math.max(1, place.priceRange))}</p>

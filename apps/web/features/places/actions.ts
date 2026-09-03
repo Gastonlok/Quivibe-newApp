@@ -279,6 +279,7 @@ export async function getPlaceBySlug(slug: string) {
           select: {
             name: true,
             email: true,
+            ownerVerifiedAt: true,
           },
         },
         categories: {
