@@ -158,12 +158,22 @@ export default function OwnersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-600 to-primary-700 text-white py-20">
+      <section className="relative overflow-hidden bg-gray-950 py-20 text-white">
+        <Image
+          src="https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1800&q=90"
+          alt="Ambiance chaleureuse d'un établissement partenaire"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/90 to-primary-900/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent" />
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl" />
         </div>
-        <div className="container mx-auto px-4 relative">
+        <div className="container relative mx-auto px-4">
           <div className="max-w-4xl">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
