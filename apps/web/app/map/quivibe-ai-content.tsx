@@ -3,11 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowUpRight, Loader2, MapPin, Sparkles, Star } from "lucide-react";
+import { ArrowUpRight, CalendarCheck2, Loader2, MapPin, Sparkles, Star } from "lucide-react";
 import type { QuivibePlace, QuivibeRecommendation } from "@/features/ai/types";
 import { defaultIntroduction, recommendPlaces } from "@/features/ai/recommend";
 
-const prompts = ["Un dîner romantique", "Un bar animé avec des amis", "Un bon restaurant à petit budget", "Où bruncher ce week-end ?"];
+const prompts = ["Un dîner romantique", "Un bar animé avec des amis", "Un bon restaurant à petit budget", "Où bruncher ce week-end ?", "Une sortie avec billard", "Un endroit avec piscine"];
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export function QuivibeAiContent({ places }: { places: QuivibePlace[] }) {
@@ -72,7 +72,7 @@ export function QuivibeAiContent({ places }: { places: QuivibePlace[] }) {
           <div className="mt-8 grid gap-5 lg:grid-cols-3">{recommendations.map((place) => (
             <article key={place.id} className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-soft transition hover:-translate-y-1 hover:shadow-medium">
               <div className="relative h-48 bg-primary-50">{place.image ? <Image src={place.image} alt={place.imageAlt} fill sizes="(min-width: 1024px) 33vw, 100vw" className="object-cover" /> : <div className="flex h-full items-center justify-center"><Sparkles className="h-10 w-10 text-primary-600" /></div>}</div>
-              <div className="p-6"><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-primary-700">{place.category}</p><h3 className="mt-2 text-xl font-extrabold text-gray-950">{place.name}</h3><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-gray-600"><MapPin className="h-4 w-4 text-primary-600" />{place.neighborhood} · {"$".repeat(place.priceRange)}</p>{place.rating && <p className="mt-2 flex items-center gap-1 text-sm font-extrabold text-gray-800"><Star className="h-4 w-4 fill-amber-400 text-amber-400" />{place.rating.toFixed(1)}</p>}<p className="mt-4 text-sm leading-6 text-gray-600">{place.reason}</p><Link href={`/places/${place.slug}`} className="mt-5 inline-flex items-center gap-2 text-sm font-extrabold text-primary-700 hover:text-primary-900">Voir l’adresse <ArrowUpRight className="h-4 w-4" /></Link></div>
+              <div className="p-6"><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-primary-700">{place.category}</p><h3 className="mt-2 text-xl font-extrabold text-gray-950">{place.name}</h3><p className="mt-2 flex items-center gap-2 text-sm font-semibold text-gray-600"><MapPin className="h-4 w-4 text-primary-600" />{place.neighborhood} · {"$".repeat(place.priceRange)}</p>{place.rating && <p className="mt-2 flex items-center gap-1 text-sm font-extrabold text-gray-800"><Star className="h-4 w-4 fill-amber-400 text-amber-400" />{place.rating.toFixed(1)}</p>}{place.availableSlot && <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-extrabold text-primary-800"><CalendarCheck2 className="h-4 w-4" />Disponible à {place.availableSlot}</p>}<p className="mt-4 text-sm leading-6 text-gray-600">{place.reason}</p><Link href={`/places/${place.slug}`} className="mt-5 inline-flex items-center gap-2 text-sm font-extrabold text-primary-700 hover:text-primary-900">Voir l’adresse <ArrowUpRight className="h-4 w-4" /></Link></div>
             </article>
           ))}</div>
         )}

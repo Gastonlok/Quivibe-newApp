@@ -25,9 +25,11 @@ export function recommendPlaces(query: string, places: QuivibePlace[]): QuivibeR
   const wantsPremium = premiumWords.some((word) => request.includes(normalized(word)));
   const wantsLively = livelyWords.some((word) => request.includes(normalized(word)));
   const requestedAmenity = amenityMatchers.find(({ pattern }) => pattern.test(request))?.amenity;
+  const needsAvailability = /disponib|reserv|ce soir|aujourd'hui|aujourdhui|demain/.test(request);
 
   return places
     .filter((place) => !requestedAmenity || place.amenities.includes(requestedAmenity))
+    .filter((place) => !needsAvailability || Boolean(place.availableSlot))
     .map((place) => {
       const searchable = normalized(`${place.name} ${place.description} ${place.category} ${place.neighborhood}`);
       let score = (place.rating || 0) * 3 + (place.reservationsEnabled ? 1 : 0);
@@ -36,9 +38,12 @@ export function recommendPlaces(query: string, places: QuivibePlace[]): QuivibeR
       if (wantsPremium) score += place.priceRange * 2;
       if (wantsLively && /bar|lounge|club|rooftop|musique|night/.test(searchable)) score += 6;
       if (requestedAmenity && place.amenities.includes(requestedAmenity)) score += 30;
+      if (place.availableSlot) score += 15;
 
       const reason = requestedAmenity && place.amenities.includes(requestedAmenity)
         ? `${AMENITY_LABELS[requestedAmenity]} disponible dans cet établissement.`
+        : place.availableSlot
+          ? `Un créneau est disponible à ${place.availableSlot}.`
         : words.some((word) => normalized(place.category).includes(word))
         ? `Une option ${place.category.toLowerCase()} qui correspond à votre envie.`
         : wantsBudget && place.priceRange <= 2

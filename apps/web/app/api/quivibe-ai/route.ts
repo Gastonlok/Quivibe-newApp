@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { defaultIntroduction, recommendPlaces } from "@/features/ai/recommend";
+import { parseReservationIntent } from "@/features/ai/reservation-intent";
 import type { QuivibePlace } from "@/features/ai/types";
 
 const requestSchema = z.object({
@@ -11,6 +12,41 @@ const requestSchema = z.object({
 
 function outputText(response: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) {
   return response.output?.flatMap((item) => item.content || []).filter((item) => item.type === "output_text").map((item) => item.text || "").join("") || "";
+}
+
+function toKinshasaDate(date: string, time: string) {
+  return new Date(`${date}T${time}:00+01:00`);
+}
+
+function timeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function availableSlot(
+  place: { id: string; reservationsEnabled: boolean; reservationCapacity: number; reservationDuration: number; maxPartySize: number; reservationStartTime: string; reservationEndTime: string; reservationInterval: number },
+  reservations: { placeId: string; dateTime: Date; partySize: number }[],
+  intent: NonNullable<ReturnType<typeof parseReservationIntent>>,
+) {
+  if (!place.reservationsEnabled || intent.partySize > place.maxPartySize) return null;
+  const slots: string[] = [];
+  for (let minutes = timeToMinutes(place.reservationStartTime); minutes + place.reservationDuration <= timeToMinutes(place.reservationEndTime); minutes += place.reservationInterval) {
+    slots.push(minutesToTime(minutes));
+  }
+  const orderedSlots = intent.requestedTime ? slots.filter((slot) => slot >= intent.requestedTime!) : slots;
+  for (const time of orderedSlots) {
+    const dateTime = toKinshasaDate(intent.date, time);
+    if (dateTime.getTime() < Date.now() + 60 * 60_000) continue;
+    const occupied = reservations
+      .filter((reservation) => reservation.placeId === place.id && Math.abs(reservation.dateTime.getTime() - dateTime.getTime()) < place.reservationDuration * 60_000)
+      .reduce((sum, reservation) => sum + reservation.partySize, 0);
+    if (occupied + intent.partySize <= place.reservationCapacity) return time;
+  }
+  return null;
 }
 
 function localMessage(query: string, places: QuivibePlace[]) {
@@ -44,15 +80,30 @@ async function enrichMessage(query: string, history: { role: "user" | "assistant
 export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Décrivez votre envie en quelques mots." }, { status: 400 });
+  const intent = parseReservationIntent(parsed.data.query);
   const places = await prisma.place.findMany({
     where: { status: "APPROVED" },
     include: { categories: { take: 1, select: { category: { select: { name: true } } } }, media: { take: 1, select: { url: true, altText: true } }, reviews: { where: { status: "APPROVED" }, select: { rating: true } } },
     orderBy: { name: "asc" },
   });
+  const reservations = intent
+    ? await prisma.reservation.findMany({
+        where: {
+          placeId: { in: places.map((place) => place.id) },
+          status: { in: ["PENDING", "CONFIRMED"] },
+          dateTime: {
+            gte: toKinshasaDate(intent.date, "00:00"),
+            lt: new Date(toKinshasaDate(intent.date, "00:00").getTime() + 24 * 60 * 60_000),
+          },
+        },
+        select: { placeId: true, dateTime: true, partySize: true },
+      })
+    : [];
   const serialized: QuivibePlace[] = places.map((place) => ({
     id: place.id, slug: place.slug, name: place.name, description: place.description, neighborhood: place.neighborhood, priceRange: place.priceRange, amenities: place.amenities,
     category: place.categories[0]?.category.name || "Établissement", rating: place.reviews.length ? place.reviews.reduce((sum, review) => sum + review.rating, 0) / place.reviews.length : null,
     image: place.media[0]?.url || null, imageAlt: place.media[0]?.altText || place.name, reservationsEnabled: place.reservationsEnabled,
+    availableSlot: intent ? availableSlot(place, reservations, intent) : null,
   }));
   const recommendations = recommendPlaces(parsed.data.query, serialized);
   const fallback = recommendations.length ? localMessage(parsed.data.query, recommendations) : defaultIntroduction(0);

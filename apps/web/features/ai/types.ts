@@ -11,6 +11,7 @@ export type QuivibePlace = {
   imageAlt: string;
   reservationsEnabled: boolean;
   amenities: string[];
+  availableSlot?: string | null;
 };
 
 export type QuivibeRecommendation = QuivibePlace & { reason: string };
