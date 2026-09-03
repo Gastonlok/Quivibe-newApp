@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { MapContent, type PublicMapPlace } from "./map-content";
+import { QuivibeAiContent } from "./quivibe-ai-content";
+import type { QuivibePlace } from "@/features/ai/types";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +21,14 @@ export default async function MapPage() {
     orderBy: { name: "asc" },
   });
 
-  const serialized: PublicMapPlace[] = places.map((place) => ({
+  const serialized: QuivibePlace[] = places.map((place) => ({
     id: place.id,
     slug: place.slug,
     name: place.name,
-    lat: place.latitude,
-    lng: place.longitude,
     category: place.categories[0]?.category.name || "Établissement",
     neighborhood: place.neighborhood,
+    description: place.description,
+    priceRange: place.priceRange,
     rating:
       place.reviews.length > 0
         ? place.reviews.reduce((sum, review) => sum + review.rating, 0) /
@@ -35,7 +36,8 @@ export default async function MapPage() {
         : null,
     image: place.media[0]?.url || null,
     imageAlt: place.media[0]?.altText || place.name,
+    reservationsEnabled: place.reservationsEnabled,
   }));
 
-  return <MapContent places={serialized} />;
+  return <QuivibeAiContent places={serialized} />;
 }

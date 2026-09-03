@@ -11,6 +11,7 @@ import {
   MapPin,
   Menu,
   Search,
+  Sparkles,
   Shield,
   Store,
   UserRound,
@@ -20,7 +21,7 @@ import { signOut, useSession } from "next-auth/react";
 
 const publicLinks = [
   { href: "/discover", label: "Restaurants", icon: Search },
-  { href: "/map", label: "Carte", icon: MapPin },
+  { href: "/map", label: "Quivibe AI", icon: Sparkles },
   { href: "/events", label: "Événements", icon: CalendarCheck2 },
 ];
 

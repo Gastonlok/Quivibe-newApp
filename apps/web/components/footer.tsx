@@ -21,7 +21,8 @@ import {
   Coffee,
   Wine,
   Music,
-  PartyPopper
+  PartyPopper,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -99,8 +100,8 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/map" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5" />
-                  Carte interactive
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Quivibe AI
                 </Link>
               </li>
               <li>
