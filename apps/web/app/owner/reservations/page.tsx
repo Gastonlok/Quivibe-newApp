@@ -3,6 +3,7 @@ import { CalendarDays, Users } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listOwnerReservationsAction } from "@/features/reservations/actions";
 import { OwnerReservationActions } from "@/features/reservations/components/owner-reservation-actions";
+import { hasOwnerWorkspaceAccess } from "@/features/owner/access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function OwnerReservationsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/owner/reservations");
-  if (!["OWNER", "ADMIN"].includes(session.user.role)) redirect("/");
+  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) redirect("/");
 
   const reservations = await listOwnerReservationsAction();
 

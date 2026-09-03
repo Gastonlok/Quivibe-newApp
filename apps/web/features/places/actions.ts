@@ -374,6 +374,7 @@ export async function getPlaceReviews(placeId: string) {
             name: true,
           },
         },
+        response: { include: { author: { select: { name: true } } } },
       },
       orderBy: {
         createdAt: "desc",

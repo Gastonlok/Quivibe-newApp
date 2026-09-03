@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasOwnerWorkspaceAccess } from "@/features/owner/access";
 
 export const dynamic = "force-dynamic";
 
@@ -38,11 +39,11 @@ function shortDay(date: Date) {
 export default async function OwnerAnalyticsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/owner/analytics");
-  if (!["OWNER", "ADMIN"].includes(session.user.role)) redirect("/");
+  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) redirect("/");
 
-  const ownerFilter = session.user.role === "ADMIN" ? {} : { ownerId: session.user.id };
+  const ownerFilter = session.user.role === "ADMIN" ? {} : { OR: [{ ownerId: session.user.id }, { collaborators: { some: { userId: session.user.id } } }] };
   const relationFilter =
-    session.user.role === "ADMIN" ? {} : { place: { ownerId: session.user.id } };
+    session.user.role === "ADMIN" ? {} : { place: ownerFilter };
   const periodStart = new Date();
   periodStart.setDate(periodStart.getDate() - 29);
   periodStart.setHours(0, 0, 0, 0);

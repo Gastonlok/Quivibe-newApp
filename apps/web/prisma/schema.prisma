@@ -30,6 +30,8 @@ model User {
   events        Event[]        @relation("EventOrganizer")
   ownerRequests OwnerRequest[]
   reservations  Reservation[]  @relation("ReservationCustomer")
+  collaborations PlaceCollaborator[]
+  reviewResponses OwnerReviewResponse[]
 
   @@map("users")
 }
@@ -126,6 +128,7 @@ model Place {
   reservations Reservation[]
   visits       PlaceVisit[]
   menuItems    MenuItem[]
+  collaborators PlaceCollaborator[]
 
   @@index([neighborhood])
   @@index([status, createdAt])
@@ -181,10 +184,41 @@ model Review {
   authorId String
   place    Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
   placeId  String
+  response OwnerReviewResponse?
 
   @@index([placeId, status, createdAt])
   @@unique([authorId, placeId])
   @@map("reviews")
+}
+
+model OwnerReviewResponse {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reviewId  String   @unique
+  authorId  String
+
+  review  Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  author  User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@map("owner_review_responses")
+}
+
+model PlaceCollaborator {
+  id        String   @id @default(cuid())
+  role      String   @default("EDITOR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  placeId   String
+  userId    String
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([placeId, userId])
+  @@index([userId])
+  @@map("place_collaborators")
 }
 
 model Favorite {

@@ -49,6 +49,12 @@ export async function PlaceReviews({ placeId }: { placeId: string }) {
               </span>
             </div>
             <p className="text-gray-700 mt-2">{review.comment}</p>
+            {review.response && (
+              <div className="mt-3 rounded-lg border-l-4 border-primary-500 bg-primary-50 p-3 text-sm text-gray-700">
+                <p className="font-bold text-gray-900">Reponse de {review.response.author.name}</p>
+                <p className="mt-1">{review.response.body}</p>
+              </div>
+            )}
           </div>
         ))}
       </div>

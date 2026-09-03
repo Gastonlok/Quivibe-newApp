@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { v2 as cloudinary, type UploadApiResponse } from "cloudinary";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canManageCollaborators, getPlaceAccess } from "./access";
 import {
   ownerMediaUrlSchema,
   ownerPlaceMenuUpdateSchema,
@@ -17,15 +18,15 @@ type ActionError = { success: false; error: string };
 
 async function getManagedPlace(placeId: string) {
   const session = await auth();
-  if (!session?.user?.id || !["OWNER", "ADMIN"].includes(session.user.role)) {
+  if (!session?.user?.id) {
     return { error: "Acces reserve aux proprietaires." } as const;
   }
 
-  const place = await prisma.place.findFirst({
-    where:
-      session.user.role === "ADMIN"
-        ? { id: placeId }
-        : { id: placeId, ownerId: session.user.id },
+  const access = await getPlaceAccess(placeId);
+  if (!access) return { error: "Etablissement introuvable ou non autorise." } as const;
+
+  const place = await prisma.place.findUnique({
+    where: { id: placeId },
     select: { id: true, slug: true },
   });
 
@@ -199,5 +200,92 @@ export async function deleteOwnerPlaceImageAction(placeId: string, mediaId: stri
 
   await prisma.media.delete({ where: { id: media.id } });
   refreshOwnerPlace(managed.place);
+  return { success: true as const };
+}
+
+export async function invitePlaceCollaboratorAction(placeId: string, email: string, role: "MANAGER" | "EDITOR") {
+  const access = await getPlaceAccess(placeId);
+  if (!canManageCollaborators(access)) return { success: false as const, error: "Seul le proprietaire ou un responsable peut gerer l'equipe." };
+
+  const collaborator = await prisma.user.findUnique({
+    where: { email: email.trim().toLowerCase() },
+    select: { id: true, name: true, email: true },
+  });
+  if (!collaborator) return { success: false as const, error: "Ce compte Quivibe est introuvable." };
+
+  const place = await prisma.place.findUnique({ where: { id: placeId }, select: { ownerId: true, slug: true } });
+  if (!place || place.ownerId === collaborator.id) return { success: false as const, error: "Ce compte est deja proprietaire de cet etablissement." };
+
+  await prisma.placeCollaborator.upsert({
+    where: { placeId_userId: { placeId, userId: collaborator.id } },
+    create: { placeId, userId: collaborator.id, role },
+    update: { role },
+  });
+  refreshOwnerPlace({ id: placeId, slug: place.slug });
+  return { success: true as const };
+}
+
+export async function removePlaceCollaboratorAction(placeId: string, collaboratorId: string) {
+  const access = await getPlaceAccess(placeId);
+  if (!canManageCollaborators(access)) return { success: false as const, error: "Acces refuse." };
+
+  const collaborator = await prisma.placeCollaborator.findFirst({ where: { id: collaboratorId, placeId }, select: { id: true } });
+  if (!collaborator) return { success: false as const, error: "Collaborateur introuvable." };
+  await prisma.placeCollaborator.delete({ where: { id: collaborator.id } });
+  const place = await prisma.place.findUnique({ where: { id: placeId }, select: { slug: true } });
+  if (place) refreshOwnerPlace({ id: placeId, slug: place.slug });
+  return { success: true as const };
+}
+
+export async function saveOwnerReviewResponseAction(reviewId: string, body: string) {
+  const session = await auth();
+  const text = body.trim();
+  if (!session?.user?.id || text.length < 2 || text.length > 1_000) {
+    return { success: false as const, error: "La reponse doit contenir entre 2 et 1 000 caracteres." };
+  }
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: { placeId: true, place: { select: { slug: true } } },
+  });
+  if (!review || !(await getPlaceAccess(review.placeId))) return { success: false as const, error: "Avis introuvable ou non autorise." };
+
+  await prisma.ownerReviewResponse.upsert({
+    where: { reviewId },
+    create: { reviewId, authorId: session.user.id, body: text },
+    update: { body: text, authorId: session.user.id },
+  });
+  refreshOwnerPlace({ id: review.placeId, slug: review.place.slug });
+  return { success: true as const };
+}
+
+export async function createOwnerEventAction(raw: { placeId: string; title: string; description: string; startDate: string; endDate?: string }) {
+  const access = await getPlaceAccess(raw.placeId);
+  if (!access) return { success: false as const, error: "Acces refuse." };
+  const title = raw.title.trim();
+  const description = raw.description.trim();
+  const startDate = new Date(raw.startDate);
+  const endDate = raw.endDate ? new Date(raw.endDate) : null;
+  if (title.length < 3 || description.length < 10 || Number.isNaN(startDate.getTime()) || (endDate && (Number.isNaN(endDate.getTime()) || endDate <= startDate))) {
+    return { success: false as const, error: "Verifiez le titre, la description et les dates de l'evenement." };
+  }
+  const place = await prisma.place.findUnique({ where: { id: raw.placeId }, select: { slug: true } });
+  if (!place) return { success: false as const, error: "Etablissement introuvable." };
+  const session = await auth();
+  await prisma.event.create({ data: { placeId: raw.placeId, organizerId: session!.user.id, title, description, startDate, endDate, status: "APPROVED" } });
+  refreshOwnerPlace({ id: raw.placeId, slug: place.slug });
+  revalidatePath("/events");
+  return { success: true as const };
+}
+
+export async function deleteOwnerEventAction(eventId: string) {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, placeId: true, place: { select: { slug: true } } },
+  });
+  if (!event || !(await getPlaceAccess(event.placeId))) return { success: false as const, error: "Evenement introuvable ou non autorise." };
+
+  await prisma.event.delete({ where: { id: event.id } });
+  refreshOwnerPlace({ id: event.placeId, slug: event.place.slug });
+  revalidatePath("/events");
   return { success: true as const };
 }

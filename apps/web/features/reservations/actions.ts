@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getPlaceAccess, hasOwnerWorkspaceAccess } from "@/features/owner/access";
 import {
   availabilitySchema,
   createReservationSchema,
@@ -276,13 +277,13 @@ export async function cancelMyReservationAction(reservationId: string) {
 
 export async function listOwnerReservationsAction() {
   const session = await auth();
-  if (!session?.user?.id || !["OWNER", "ADMIN"].includes(session.user.role)) return [];
+  if (!session?.user?.id || !(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) return [];
 
   return prisma.reservation.findMany({
     where:
       session.user.role === "ADMIN"
         ? {}
-        : { place: { ownerId: session.user.id } },
+        : { place: { OR: [{ ownerId: session.user.id }, { collaborators: { some: { userId: session.user.id } } }] } },
     include: {
       customer: { select: { name: true, email: true } },
       place: { select: { name: true, slug: true } },
@@ -296,7 +297,7 @@ export async function updateReservationStatusAction(
   nextStatus: string,
 ) {
   const session = await auth();
-  if (!session?.user?.id || !["OWNER", "ADMIN"].includes(session.user.role)) {
+  if (!session?.user?.id) {
     return { success: false as const, error: "Non autorisé." };
   }
 
@@ -308,13 +309,14 @@ export async function updateReservationStatusAction(
   const reservation = await prisma.reservation.findFirst({
     where: {
       id: reservationId,
-      ...(session.user.role === "ADMIN"
-        ? {}
-        : { place: { ownerId: session.user.id } }),
     },
-    select: { id: true, status: true },
+    select: { id: true, status: true, placeId: true },
   });
   if (!reservation) return { success: false as const, error: "Réservation introuvable." };
+
+  if (!(await getPlaceAccess(reservation.placeId))) {
+    return { success: false as const, error: "Acces refuse." };
+  }
 
   const allowedTransitions: Record<string, string[]> = {
     PENDING: ["CONFIRMED", "CANCELLED"],

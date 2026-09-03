@@ -15,16 +15,19 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasOwnerWorkspaceAccess } from "@/features/owner/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function OwnerDashboard() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/owner/dashboard");
-  if (!["OWNER", "ADMIN"].includes(session.user.role)) redirect("/");
+  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) redirect("/");
 
   const ownerFilter =
-    session.user.role === "ADMIN" ? {} : { ownerId: session.user.id };
+    session.user.role === "ADMIN"
+      ? {}
+      : { OR: [{ ownerId: session.user.id }, { collaborators: { some: { userId: session.user.id } } }] };
 
   const [places, upcomingReservations, recentReviews] = await Promise.all([
     prisma.place.findMany({
@@ -51,7 +54,7 @@ export default async function OwnerDashboard() {
         status: { in: ["PENDING", "CONFIRMED"] },
         ...(session.user.role === "ADMIN"
           ? {}
-          : { place: { ownerId: session.user.id } }),
+          : { place: ownerFilter }),
       },
       include: {
         customer: { select: { name: true, email: true } },
@@ -65,7 +68,7 @@ export default async function OwnerDashboard() {
         status: "APPROVED",
         ...(session.user.role === "ADMIN"
           ? {}
-          : { place: { ownerId: session.user.id } }),
+          : { place: ownerFilter }),
       },
       include: {
         author: { select: { name: true } },

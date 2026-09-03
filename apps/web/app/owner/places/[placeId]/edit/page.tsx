@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { OwnerPlaceEditor } from "@/features/owner/components/owner-place-editor";
 import { OwnerPlaceMenuEditor } from "@/features/owner/components/owner-place-menu-editor";
+import { OwnerCollaborationPanel } from "@/features/owner/components/owner-collaboration-panel";
+import { OwnerEngagementPanel } from "@/features/owner/components/owner-engagement-panel";
+import { canManageCollaborators, getPlaceAccess } from "@/features/owner/access";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -15,19 +18,25 @@ export default async function OwnerPlaceEditPage({
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/owner/dashboard");
-  if (!["OWNER", "ADMIN"].includes(session.user.role)) redirect("/");
 
   const { placeId } = await params;
+  const access = await getPlaceAccess(placeId);
+  if (!access) redirect("/");
   const [place, categories] = await Promise.all([
     prisma.place.findFirst({
-      where:
-        session.user.role === "ADMIN"
-          ? { id: placeId }
-          : { id: placeId, ownerId: session.user.id },
+      where: { id: placeId },
       include: {
         categories: { include: { category: true } },
         media: { orderBy: { createdAt: "asc" }, select: { id: true, url: true, altText: true } },
         menuItems: { orderBy: { sortOrder: "asc" } },
+        collaborators: { include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } },
+        reviews: {
+          where: { status: "APPROVED" },
+          include: { author: { select: { name: true } }, response: { select: { body: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+        events: { where: { startDate: { gte: new Date() } }, orderBy: { startDate: "asc" }, take: 10 },
       },
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
@@ -62,6 +71,16 @@ export default async function OwnerPlaceEditPage({
             placeId={place.id}
             initialMenuVisible={place.menuVisible}
             initialItems={place.menuItems}
+          />
+        </div>
+        <div className="mt-6">
+          <OwnerEngagementPanel placeId={place.id} reviews={place.reviews} events={place.events} />
+        </div>
+        <div className="mt-6">
+          <OwnerCollaborationPanel
+            placeId={place.id}
+            collaborators={place.collaborators}
+            canManage={canManageCollaborators(access)}
           />
         </div>
       </div>
