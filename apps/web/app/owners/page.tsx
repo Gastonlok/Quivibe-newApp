@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function OwnersPage() {
   const router = useRouter();
@@ -282,8 +283,26 @@ export default function OwnersPage() {
 
       {/* Section Formulaire de contact */}
       <section id="contact" className="py-20">
-        <div className="container mx-auto px-4 max-w-3xl">
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div className="container mx-auto max-w-6xl px-4">
+          <div className="grid overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xl lg:grid-cols-[0.9fr_1.1fr]">
+            <aside className="relative min-h-80 overflow-hidden bg-gray-950 p-8 text-white sm:p-10">
+              <Image
+                src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=85"
+                alt="Restaurant accueillant prêt à recevoir ses clients"
+                fill
+                sizes="(min-width: 1024px) 45vw, 100vw"
+                className="object-cover opacity-65"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/45 to-primary-900/20" />
+              <div className="relative flex h-full flex-col justify-end">
+                <p className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold backdrop-blur"><Sparkles className="h-4 w-4 text-primary-200" /> Partenaires Quivibe</p>
+                <h2 className="mt-5 text-3xl font-extrabold tracking-tight">Faites vibrer votre établissement.</h2>
+                <p className="mt-3 max-w-md text-sm leading-7 text-gray-200">Présentez votre adresse aux Kinois qui cherchent leur prochaine sortie, puis pilotez vos réservations et votre réputation depuis Quivibe Pro.</p>
+                <div className="mt-6 flex items-center gap-3 text-sm font-bold text-primary-100"><CheckCircle className="h-5 w-5" /> Une demande, une fiche, un espace pro.</div>
+              </div>
+            </aside>
+
+            <div className="p-6 sm:p-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900">Devenir partenaire</h2>
               <p className="text-gray-600 mt-1">
@@ -442,6 +461,7 @@ export default function OwnersPage() {
             <p className="text-center text-sm text-gray-500 mt-4">
               En soumettant ce formulaire, vous acceptez d'être contacté par notre équipe.
             </p>
+            </div>
           </div>
         </div>
       </section>
