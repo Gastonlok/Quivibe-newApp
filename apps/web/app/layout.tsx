@@ -6,8 +6,10 @@ import { Navbar } from "@/components/navbar";
 import { PageNavigation } from "@/components/page-navigation";
 import { Footer } from "@/components/footer";
 import { SessionProvider } from "next-auth/react";
+import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Quivibe — Réservez les meilleures tables de Kinshasa",
   description:
     "Découvrez, comparez et réservez restaurants, bars, lounges et expériences à Kinshasa.",

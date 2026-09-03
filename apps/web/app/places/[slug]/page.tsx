@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getPlaceBySlug } from "@/features/places/actions";
 import { PlaceHeader } from "@/features/places/components/place-header";
@@ -11,6 +12,7 @@ import { DirectionsButton } from "@/features/places/components/directions-button
 import { PlaceEvents } from "@/features/places/components/place-events";
 import { ReservationWidget } from "@/features/reservations/components/reservation-widget";
 import { PlaceVisitTracker } from "@/features/owner/components/place-visit-tracker";
+import { siteUrl } from "@/lib/site";
 
 
 export const dynamic = "force-dynamic";
@@ -18,14 +20,46 @@ interface PlacePageProps {
   params: Promise<{ slug: string }>;
 }
 
+export async function generateMetadata({ params }: PlacePageProps): Promise<Metadata> {
+  const place = await getPlaceBySlug((await params).slug);
+  if (!place) return { title: "Établissement introuvable | Quivibe" };
+
+  const title = `${place.name} à ${place.neighborhood}, Kinshasa | Quivibe`;
+  const description = place.description.slice(0, 155);
+  return {
+    title,
+    description,
+    alternates: { canonical: `/places/${place.slug}` },
+    openGraph: {
+      title,
+      description,
+      url: `${siteUrl}/places/${place.slug}`,
+      images: place.media[0] ? [{ url: place.media[0].url, alt: place.media[0].altText || place.name }] : [],
+    },
+  };
+}
+
 export default async function PlacePage({ params }: PlacePageProps) {
   const { slug } = await params;
   const place = await getPlaceBySlug(slug);
 
   if (!place) notFound();
+  const localBusiness = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: place.name,
+    description: place.description,
+    image: place.media.map((media) => media.url),
+    address: { "@type": "PostalAddress", streetAddress: place.address, addressLocality: place.neighborhood, addressRegion: "Kinshasa", addressCountry: "CD" },
+    geo: { "@type": "GeoCoordinates", latitude: place.latitude, longitude: place.longitude },
+    priceRange: "$".repeat(place.priceRange),
+    url: `${siteUrl}/places/${place.slug}`,
+    aggregateRating: place.averageRating !== null ? { "@type": "AggregateRating", ratingValue: place.averageRating.toFixed(1), reviewCount: place.reviews.length } : undefined,
+  };
 
   return (
     <main className="bg-gray-50">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusiness) }} />
       <PlaceVisitTracker placeId={place.id} />
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_23rem]">
