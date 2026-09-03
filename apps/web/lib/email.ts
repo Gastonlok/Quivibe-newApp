@@ -169,3 +169,68 @@ export function sendPasswordResetEmail(email: string, name: string, url: string)
     ),
   });
 }
+
+export function sendReservationEmail(input: {
+  email: string;
+  name: string;
+  placeName: string;
+  reference: string;
+  dateTime: Date;
+  status: string;
+}) {
+  const cancelled = input.status === "CANCELLED";
+  const date = new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "Africa/Kinshasa",
+  }).format(input.dateTime);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  return sendEmail({
+    to: input.email,
+    subject: cancelled ? "Votre reservation Quivibe est annulee" : "Votre reservation Quivibe est confirmee",
+    html: emailLayout(
+      cancelled ? "Reservation annulee" : "Reservation enregistree",
+      `<p style="line-height:1.7">Bonjour ${escapeHtml(input.name)}, votre reservation chez <strong>${escapeHtml(input.placeName)}</strong> ${cancelled ? "a ete annulee" : "est enregistree"}.</p><p style="line-height:1.7"><strong>Date :</strong> ${escapeHtml(date)}<br/><strong>Reference :</strong> ${escapeHtml(input.reference)}</p>`,
+      { label: "Voir mes reservations", url: `${appUrl}/reservations` },
+    ),
+  });
+}
+
+
+export function sendReservationReminderEmail(input: {
+  email: string;
+  name: string;
+  placeName: string;
+  reference: string;
+  dateTime: Date;
+}) {
+  const date = new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "Africa/Kinshasa",
+  }).format(input.dateTime);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return sendEmail({
+    to: input.email,
+    subject: `Rappel : votre reservation chez ${input.placeName} est demain`,
+    html: emailLayout(
+      "Votre table vous attend demain",
+      `<p style="line-height:1.7">Bonjour ${escapeHtml(input.name)}, rappel de votre reservation chez <strong>${escapeHtml(input.placeName)}</strong>.</p><p style="line-height:1.7"><strong>Date :</strong> ${escapeHtml(date)}<br/><strong>Reference :</strong> ${escapeHtml(input.reference)}</p>`,
+      { label: "Voir ma reservation", url: `${appUrl}/reservations` },
+    ),
+  });
+}
+
+export function sendWaitlistAvailabilityEmail(email: string, name: string, placeName: string, placeSlug: string) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return sendEmail({
+    to: email,
+    subject: `Une table peut etre disponible chez ${placeName}`,
+    html: emailLayout(
+      "Une disponibilite vient de se liberer",
+      `<p style="line-height:1.7">Bonjour ${escapeHtml(name)}, une table peut etre disponible chez <strong>${escapeHtml(placeName)}</strong>. Reprenez votre reservation rapidement pour consulter les creneaux proposes.</p>`,
+      { label: "Voir les disponibilites", url: `${appUrl}/places/${placeSlug}` },
+    ),
+  });
+}

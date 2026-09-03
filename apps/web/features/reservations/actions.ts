@@ -6,10 +6,12 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPlaceAccess, hasOwnerWorkspaceAccess } from "@/features/owner/access";
+import { sendReservationEmail, sendWaitlistAvailabilityEmail } from "@/lib/email";
 import {
   availabilitySchema,
   createReservationSchema,
   reservationStatusSchema,
+  waitlistSchema,
   type CreateReservationInput,
 } from "./schema";
 
@@ -58,6 +60,12 @@ function getScheduleSlots(schedule: ReservationSchedule) {
 function formatReference(date: string) {
   const day = date.replaceAll("-", "");
   return `QV-${day}-${randomUUID().slice(0, 6).toUpperCase()}`;
+}
+
+function dayRange(dateTime: Date) {
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kinshasa" }).format(dateTime);
+  const start = toKinshasaDate(date, "00:00");
+  return { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60_000) };
 }
 
 async function occupiedSeats(
@@ -153,6 +161,7 @@ export async function createReservationAction(raw: CreateReservationInput) {
     where: { id: input.placeId, status: "APPROVED" },
     select: {
       id: true,
+      name: true,
       slug: true,
       reservationsEnabled: true,
       reservationCapacity: true,
@@ -220,11 +229,42 @@ export async function createReservationAction(raw: CreateReservationInput) {
   revalidatePath("/reservations");
   revalidatePath("/owner/reservations");
 
+  void sendReservationEmail({
+    email: session.user.email,
+    name: session.user.name,
+    placeName: place.name,
+    reference: reservation.reference,
+    dateTime,
+    status: reservation.status,
+  });
+
   return {
     success: true as const,
     reference: reservation.reference,
     status: reservation.status,
   };
+}
+
+export async function joinReservationWaitlistAction(raw: { placeId: string; date: string; partySize: number }) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false as const, code: "UNAUTHENTICATED", error: "Connexion requise." };
+  const parsed = waitlistSchema.safeParse(raw);
+  if (!parsed.success) return { success: false as const, code: "INVALID_INPUT", error: "Informations de liste d'attente invalides." };
+
+  const input = parsed.data;
+  const place = await prisma.place.findFirst({
+    where: { id: input.placeId, status: "APPROVED", reservationsEnabled: true },
+    select: { id: true, maxPartySize: true },
+  });
+  if (!place || input.partySize > place.maxPartySize) return { success: false as const, code: "UNAVAILABLE", error: "Cet etablissement ne peut pas recevoir cette demande." };
+
+  const date = toKinshasaDate(input.date, "00:00");
+  await prisma.reservationWaitlist.upsert({
+    where: { placeId_customerId_date: { placeId: place.id, customerId: session.user.id, date } },
+    create: { placeId: place.id, customerId: session.user.id, date, partySize: input.partySize },
+    update: { partySize: input.partySize, status: "WAITING", notifiedAt: null },
+  });
+  return { success: true as const };
 }
 
 export async function listMyReservationsAction() {
@@ -254,7 +294,7 @@ export async function cancelMyReservationAction(reservationId: string) {
 
   const reservation = await prisma.reservation.findFirst({
     where: { id: reservationId, customerId: session.user.id },
-    select: { id: true, dateTime: true, status: true },
+    select: { id: true, reference: true, dateTime: true, status: true, partySize: true, placeId: true, place: { select: { name: true, slug: true } } },
   });
 
   if (!reservation) return { success: false as const, error: "Réservation introuvable." };
@@ -268,6 +308,28 @@ export async function cancelMyReservationAction(reservationId: string) {
   await prisma.reservation.update({
     where: { id: reservation.id },
     data: { status: "CANCELLED", cancelledAt: new Date() },
+  });
+
+  const waitingEntries = await prisma.reservationWaitlist.findMany({
+    where: { placeId: reservation.placeId, date: dayRange(reservation.dateTime), status: "WAITING" },
+    include: { customer: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "asc" },
+    take: 3,
+  });
+  await Promise.all(waitingEntries.map(async (entry) => {
+    const notification = await sendWaitlistAvailabilityEmail(entry.customer.email, entry.customer.name, reservation.place.name, reservation.place.slug);
+    if (notification.success) {
+      await prisma.reservationWaitlist.update({ where: { id: entry.id }, data: { status: "NOTIFIED", notifiedAt: new Date() } });
+    }
+  }));
+
+  void sendReservationEmail({
+    email: session.user.email,
+    name: session.user.name,
+    placeName: reservation.place.name,
+    reference: reservation.reference,
+    dateTime: reservation.dateTime,
+    status: "CANCELLED",
   });
 
   revalidatePath("/reservations");

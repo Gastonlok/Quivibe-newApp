@@ -6,6 +6,7 @@ import { CalendarDays, CheckCircle2, Clock3, Loader2, Users } from "lucide-react
 import {
   createReservationAction,
   getAvailableSlotsAction,
+  joinReservationWaitlistAction,
 } from "../actions";
 
 interface ReservationWidgetProps {
@@ -44,6 +45,7 @@ export function ReservationWidget({
     reference: string;
     status: string;
   } | null>(null);
+  const [waitlistMessage, setWaitlistMessage] = useState("");
 
   const partyOptions = useMemo(
     () => Array.from({ length: Math.max(1, maxPartySize) }, (_, index) => index + 1),
@@ -97,6 +99,22 @@ export function ReservationWidget({
     }
 
     setConfirmation({ reference: result.reference, status: result.status });
+  }
+
+  async function joinWaitlist() {
+    setSubmitting(true);
+    setError("");
+    const result = await joinReservationWaitlistAction({ placeId, date, partySize });
+    setSubmitting(false);
+    if (!result.success) {
+      if (result.code === "UNAUTHENTICATED") {
+        router.push(`/login?callbackUrl=/places/${placeSlug}`);
+        return;
+      }
+      setError(result.error);
+      return;
+    }
+    setWaitlistMessage("Vous etes inscrit(e) sur la liste d'attente pour cette date.");
   }
 
   if (confirmation) {
@@ -204,9 +222,13 @@ export function ReservationWidget({
               ))}
             </div>
           ) : (
-            <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
-              Aucun créneau disponible pour cette date.
-            </p>
+            <div className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
+              <p>Aucun créneau disponible pour cette date.</p>
+              <button type="button" onClick={joinWaitlist} disabled={submitting} className="mt-3 font-bold text-primary-700 hover:underline disabled:opacity-50">
+                {submitting ? "Inscription..." : "Me prévenir si une table se libère"}
+              </button>
+              {waitlistMessage && <p className="mt-2 font-semibold text-primary-700">{waitlistMessage}</p>}
+            </div>
           )}
         </fieldset>
 

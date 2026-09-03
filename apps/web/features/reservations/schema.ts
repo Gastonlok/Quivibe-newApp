@@ -15,6 +15,12 @@ export const availabilitySchema = z.object({
   partySize: z.coerce.number().int().min(1).max(30),
 });
 
+export const waitlistSchema = z.object({
+  placeId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  partySize: z.coerce.number().int().min(1).max(30),
+});
+
 export const reservationStatusSchema = z.enum([
   "PENDING",
   "CONFIRMED",

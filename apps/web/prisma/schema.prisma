@@ -32,6 +32,7 @@ model User {
   reservations  Reservation[]  @relation("ReservationCustomer")
   collaborations PlaceCollaborator[]
   reviewResponses OwnerReviewResponse[]
+  waitlistEntries ReservationWaitlist[]
 
   @@map("users")
 }
@@ -129,6 +130,7 @@ model Place {
   visits       PlaceVisit[]
   menuItems    MenuItem[]
   collaborators PlaceCollaborator[]
+  waitlistEntries ReservationWaitlist[]
 
   @@index([neighborhood])
   @@index([status, createdAt])
@@ -276,6 +278,7 @@ model Reservation {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   cancelledAt    DateTime?
+  reminderSentAt DateTime?
 
   customer   User   @relation("ReservationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   customerId String
@@ -285,6 +288,24 @@ model Reservation {
   @@index([customerId, dateTime])
   @@index([placeId, dateTime, status])
   @@map("reservations")
+}
+
+model ReservationWaitlist {
+  id         String   @id @default(cuid())
+  date       DateTime
+  partySize  Int
+  status     String   @default("WAITING")
+  notifiedAt DateTime?
+  createdAt  DateTime @default(now())
+  placeId    String
+  customerId String
+
+  place    Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  customer User  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([placeId, customerId, date])
+  @@index([placeId, date, status])
+  @@map("reservation_waitlist")
 }
 
 model PlaceVisit {
