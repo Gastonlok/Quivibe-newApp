@@ -50,6 +50,7 @@ export interface PlaceWithFavorites {
     rating: number;
   }[];
   favorites?: { userId: string }[];
+  events?: { id: string }[];
 }
 
 export interface ListPlacesResult {
@@ -79,6 +80,8 @@ const listPlacesSchema = z.object({
   neighborhood: z.string().optional(),
   priceRange: z.string().optional(),
   page: z.string().optional(),
+  reservationsOnly: z.enum(["true"]).optional(),
+  eventsOnly: z.enum(["true"]).optional(),
   category: z.string().optional(), // ✅ ICI
 });
 
@@ -181,6 +184,14 @@ export async function listPlacesAction(
       where.priceRange = { equals: parseInt(validated.priceRange) };
     }
 
+    if (validated.reservationsOnly) {
+      where.reservationsEnabled = true;
+    }
+
+    if (validated.eventsOnly) {
+      where.events = { some: { status: "APPROVED", startDate: { gte: new Date() } } };
+    }
+
     // ✅ Filtre par catégorie
     if (validated.category) {
       where.categories = {
@@ -220,6 +231,7 @@ export async function listPlacesAction(
                 },
               }
             : false,
+          events: { where: { status: "APPROVED", startDate: { gte: new Date() } }, select: { id: true }, take: 1 },
         },
         orderBy: {
           createdAt: "desc",

@@ -1,139 +1,59 @@
-// apps/web/app/discover/discover-content.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Loader2, MapPin } from "lucide-react";
 import { PlaceCard } from "@/features/places/components/place-card";
-import { listPlacesAction } from "@/features/places/actions";
-import { Loader2 } from "lucide-react";
-import type { PlaceWithFavorites } from "@/features/places/actions";
+import { listPlacesAction, type PlaceWithFavorites } from "@/features/places/actions";
 
 export default function DiscoverContent() {
   const searchParams = useSearchParams();
   const [places, setPlaces] = useState<PlaceWithFavorites[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [category, setCategory] = useState("");
+  const [budget, setBudget] = useState("");
+  const [reservationsOnly, setReservationsOnly] = useState(false);
+  const [eventsOnly, setEventsOnly] = useState(false);
+  const [position, setPosition] = useState<GeolocationCoordinates | null>(null);
 
   useEffect(() => {
-    const fetchPlaces = async () => {
+    async function load() {
       setLoading(true);
-      try {
-        const result = await listPlacesAction({
-          search: searchParams.get("search") || undefined,
-          neighborhood: searchParams.get("neighborhood") || undefined,
-          priceRange: searchParams.get("priceRange") || undefined,
-          page: searchParams.get("page") || "1",
-          category: selectedCategory || undefined,
-        });
-
-        if (result.success && result.data) {
-          setPlaces(result.data.places);
-          setTotal(result.data.total);
-        }
-      } catch (error) {
-        console.error("Erreur:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPlaces();
-  }, [searchParams, selectedCategory]);
-
-  const handleCategoryClick = (category: string) => {
-    setSelectedCategory(selectedCategory === category ? "" : category);
-  };
-
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const searchInput = form.querySelector('input[name="search"]') as HTMLInputElement;
-    const params = new URLSearchParams(searchParams);
-    if (searchInput.value) {
-      params.set("search", searchInput.value);
-    } else {
-      params.delete("search");
+      const result = await listPlacesAction({ search: searchParams.get("search") || undefined, neighborhood: searchParams.get("neighborhood") || undefined, priceRange: budget || undefined, page: "1", category: category || undefined, reservationsOnly: reservationsOnly ? "true" : undefined, eventsOnly: eventsOnly ? "true" : undefined });
+      if (result.success && result.data) { setPlaces(result.data.places); setTotal(result.data.total); }
+      setLoading(false);
     }
-    window.history.pushState(null, "", `?${params.toString()}`);
-  };
+    void load();
+  }, [searchParams, category, budget, reservationsOnly, eventsOnly]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-      </div>
-    );
+  const sorted = position ? [...places].sort((a, b) => distance(position, a.latitude, a.longitude) - distance(position, b.latitude, b.longitude)) : places;
+
+  function search(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = String(new FormData(event.currentTarget).get("search") || "");
+    const params = new URLSearchParams(searchParams);
+    value ? params.set("search", value) : params.delete("search");
+    window.history.pushState(null, "", `?${params.toString()}`);
   }
 
-  return (
-    <main className="px-6 py-10 flex flex-col gap-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Où sort-on ce soir ?</h1>
-        <p className="text-gray-600 text-sm mt-1">
-          {total} établissement{total > 1 ? "s" : ""} à découvrir à Kinshasa
-        </p>
-      </div>
+  return <main className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10">
+    <div><p className="text-sm font-extrabold uppercase tracking-[0.18em] text-primary-700">Explorer Kinshasa</p><h1 className="mt-2 text-3xl font-extrabold text-gray-950">Ou sort-on ce soir ?</h1><p className="mt-1 text-sm text-gray-600">{total} établissement{total > 1 ? "s" : ""} à découvrir</p></div>
+    <form onSubmit={search} className="flex gap-2"><input name="search" defaultValue={searchParams.get("search") || ""} placeholder="Lieu, cuisine ou quartier..." className="min-w-0 flex-1 rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-primary-600" /><button className="rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white">Rechercher</button></form>
+    <div className="flex flex-wrap gap-2">{["restaurant", "bar", "lounge", "rooftop", "cafe"].map((item) => <button key={item} type="button" onClick={() => setCategory(category === item ? "" : item)} className={`rounded-full px-4 py-2 text-sm font-bold ${category === item ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-700"}`}>{item}</button>)}</div>
+    <section className="flex flex-wrap gap-2 rounded-2xl border border-gray-200 bg-white p-3"><select value={budget} onChange={(event) => setBudget(event.target.value)} className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700"><option value="">Tous les budgets</option><option value="1">$ - Petit budget</option><option value="2">$$ - Modere</option><option value="3">$$$ - Premium</option><option value="4">$$$$ - Luxe</option></select><Filter active={reservationsOnly} toggle={() => setReservationsOnly(!reservationsOnly)} label="Reservation ouverte" /><Filter active={eventsOnly} toggle={() => setEventsOnly(!eventsOnly)} label="Evenements a venir" /><button type="button" onClick={() => navigator.geolocation?.getCurrentPosition((next) => setPosition(next.coords))} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${position ? "bg-primary-50 text-primary-800" : "bg-gray-100 text-gray-700"}`}><MapPin className="h-4 w-4" />Pres de moi</button></section>
+    {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div> : sorted.length === 0 ? <div className="py-12 text-center text-gray-600">Aucun établissement ne correspond à ces filtres.</div> : <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{sorted.map((place) => <PlaceCard key={place.id} place={place} />)}</div>}
+  </main>;
+}
 
-      {/* Barre de recherche */}
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <input
-          type="text"
-          name="search"
-          defaultValue={searchParams.get("search") || ""}
-          placeholder="Rechercher un lieu, une ambiance..."
-          className="border rounded-lg px-4 py-2 flex-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-        <button
-          type="submit"
-          className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-        >
-          Rechercher
-        </button>
-      </form>
+function Filter({ active, label, toggle }: { active: boolean; label: string; toggle: () => void }) {
+  return <button type="button" onClick={toggle} className={`rounded-xl px-3 py-2 text-sm font-bold ${active ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-700"}`}>{label}</button>;
+}
 
-      {/* Filtres par catégorie */}
-      <div className="flex gap-2 flex-wrap">
-        {["restaurant", "bar", "lounge", "rooftop", "cafe"].map((cat) => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryClick(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              selectedCategory === cat
-                ? "bg-primary-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {cat.charAt(0).toUpperCase() + cat.slice(1)}
-          </button>
-        ))}
-        {selectedCategory && (
-          <button
-            onClick={() => setSelectedCategory("")}
-            className="px-4 py-2 rounded-full text-sm font-medium bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-          >
-            ✕ Effacer
-          </button>
-        )}
-      </div>
-
-      {/* Résultats */}
-      {places.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-600">
-            Aucun établissement ne correspond à ta recherche.
-          </p>
-          <p className="text-gray-400 text-sm mt-1">
-            Essaie de modifier tes filtres ou ta recherche.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {places.map((place) => (
-            <PlaceCard key={place.id} place={place} />
-          ))}
-        </div>
-      )}
-    </main>
-  );
+function distance(position: GeolocationCoordinates, latitude: number, longitude: number) {
+  const radians = (value: number) => (value * Math.PI) / 180;
+  const lat = radians(latitude - position.latitude);
+  const lng = radians(longitude - position.longitude);
+  const value = Math.sin(lat / 2) ** 2 + Math.cos(radians(position.latitude)) * Math.cos(radians(latitude)) * Math.sin(lng / 2) ** 2;
+  return 12_742 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }

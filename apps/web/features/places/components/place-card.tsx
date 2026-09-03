@@ -19,6 +19,7 @@ interface PlaceCardProps {
     reviews?: { rating: number }[];
     isFavorite?: boolean;
     reservationsEnabled?: boolean;
+    events?: { id: string }[];
   };
 }
 
@@ -136,6 +137,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
                 Réserver
               </span>
             )}
+            {place.events?.length ? <span className="text-xs font-extrabold text-primary-700">Evenement a venir</span> : null}
           </div>
         </div>
       </Link>
