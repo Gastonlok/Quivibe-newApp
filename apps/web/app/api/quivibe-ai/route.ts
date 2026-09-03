@@ -4,13 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { defaultIntroduction, recommendPlaces } from "@/features/ai/recommend";
 import type { QuivibePlace } from "@/features/ai/types";
 
-const requestSchema = z.object({ query: z.string().trim().min(2).max(500) });
+const requestSchema = z.object({
+  query: z.string().trim().min(2).max(500),
+  history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(1_000) })).max(8).optional(),
+});
 
 function outputText(response: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) {
   return response.output?.flatMap((item) => item.content || []).filter((item) => item.type === "output_text").map((item) => item.text || "").join("") || "";
 }
 
-async function enrichIntroduction(query: string, places: QuivibePlace[], fallback: string) {
+function localMessage(query: string, places: QuivibePlace[]) {
+  if (places.length === 0) return "Je n’ai pas trouvé d’adresse qui corresponde exactement à cette demande pour le moment. Essayez de préciser le quartier, le budget ou une autre ambiance, et je relancerai la recherche.";
+  const names = places.map((place) => place.name).join(", ");
+  return `Pour ${query.toLowerCase()}, je te suggère ${names}. J’ai privilégié les lieux qui correspondent à ton envie, à leur ambiance et aux informations déclarées par les établissements. Ouvre une fiche pour voir les photos, les équipements et réserver si tu trouves ta vibe.`;
+}
+
+async function enrichMessage(query: string, history: { role: "user" | "assistant"; content: string }[], places: QuivibePlace[], fallback: string) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || places.length === 0) return fallback;
   try {
@@ -19,8 +28,8 @@ async function enrichIntroduction(query: string, places: QuivibePlace[], fallbac
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || "gpt-5-mini",
-        input: `Tu es Quivibe AI, un guide de sorties à Kinshasa. Réponds en français, en une phrase courte et chaleureuse. L'utilisateur cherche : "${query}". Propose ces adresses, sans en inventer : ${places.map((place) => `${place.name} (${place.category}, ${place.neighborhood})`).join(", ")}.`,
-        max_output_tokens: 120,
+        input: `Tu es Quivibe AI, un guide de sorties à Kinshasa. Réponds en français de manière chaleureuse, précise et conversationnelle, en 2 à 4 phrases courtes. Ne propose jamais une adresse qui n'est pas dans la liste. Prends en compte l'historique : ${history.map((message) => `${message.role === "user" ? "Client" : "Quivibe AI"}: ${message.content}`).join(" | ")}. Nouvelle demande : "${query}". Adresses disponibles : ${places.map((place) => `${place.name} (${place.category}, ${place.neighborhood}, budget ${place.priceRange}/4, équipements: ${place.amenities.join(", ") || "non renseignés"})`).join("; ")}.`,
+        max_output_tokens: 260,
       }),
       signal: AbortSignal.timeout(8000),
     });
@@ -46,5 +55,6 @@ export async function POST(request: Request) {
     image: place.media[0]?.url || null, imageAlt: place.media[0]?.altText || place.name, reservationsEnabled: place.reservationsEnabled,
   }));
   const recommendations = recommendPlaces(parsed.data.query, serialized);
-  return NextResponse.json({ introduction: await enrichIntroduction(parsed.data.query, recommendations, defaultIntroduction(recommendations.length)), recommendations });
+  const fallback = recommendations.length ? localMessage(parsed.data.query, recommendations) : defaultIntroduction(0);
+  return NextResponse.json({ message: await enrichMessage(parsed.data.query, parsed.data.history || [], recommendations, fallback), recommendations });
 }

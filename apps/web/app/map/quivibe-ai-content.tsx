@@ -8,10 +8,11 @@ import type { QuivibePlace, QuivibeRecommendation } from "@/features/ai/types";
 import { defaultIntroduction, recommendPlaces } from "@/features/ai/recommend";
 
 const prompts = ["Un dîner romantique", "Un bar animé avec des amis", "Un bon restaurant à petit budget", "Où bruncher ce week-end ?"];
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export function QuivibeAiContent({ places }: { places: QuivibePlace[] }) {
   const [query, setQuery] = useState("");
-  const [introduction, setIntroduction] = useState("Dites-moi ce dont vous avez envie, je vous trouve la bonne sortie.");
+  const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: "Bonjour, je suis Quivibe AI. Dis-moi où tu veux sortir, avec qui et l’ambiance recherchée : je te proposerai des adresses adaptées." }]);
   const [recommendations, setRecommendations] = useState<QuivibeRecommendation[]>(() => recommendPlaces("", places));
   const [loading, setLoading] = useState(false);
 
@@ -19,16 +20,18 @@ export function QuivibeAiContent({ places }: { places: QuivibePlace[] }) {
     const prompt = value.trim();
     if (prompt.length < 2) return;
     setQuery(prompt);
+    const nextHistory = [...messages, { role: "user" as const, content: prompt }];
+    setMessages(nextHistory);
     setLoading(true);
     try {
-      const response = await fetch("/api/quivibe-ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: prompt }) });
+      const response = await fetch("/api/quivibe-ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: prompt, history: messages.slice(-6) }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
-      setIntroduction(data.introduction);
+      setMessages((current) => [...current, { role: "assistant", content: data.message }]);
       setRecommendations(data.recommendations);
     } catch (error) {
       const fallback = recommendPlaces(prompt, places);
-      setIntroduction(error instanceof Error ? `${error.message} Voici quelques idées disponibles.` : defaultIntroduction(fallback.length));
+      setMessages((current) => [...current, { role: "assistant", content: error instanceof Error ? `${error.message} Voici quelques idées disponibles.` : defaultIntroduction(fallback.length) }]);
       setRecommendations(fallback);
     } finally {
       setLoading(false);
@@ -57,7 +60,14 @@ export function QuivibeAiContent({ places }: { places: QuivibePlace[] }) {
         </div>
       </section>
       <section className="container py-10 sm:py-14">
-        <div className="max-w-3xl"><p className="text-sm font-extrabold uppercase tracking-[0.16em] text-primary-700">Votre sélection</p><h2 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-950">{introduction}</h2></div>
+        <div className="max-w-3xl rounded-3xl border border-gray-200 bg-white p-5 shadow-soft sm:p-6">
+          <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-primary-700">Conversation avec Quivibe AI</p>
+          <div className="mt-5 space-y-4">
+            {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "ml-auto bg-gray-950 text-white" : "bg-primary-50 text-gray-800"}`}>{message.content}</div>)}
+            {loading && <div className="flex w-fit items-center gap-2 rounded-2xl bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-800"><Loader2 className="h-4 w-4 animate-spin" /> Quivibe AI réfléchit…</div>}
+          </div>
+        </div>
+        <div className="mt-10 max-w-3xl"><p className="text-sm font-extrabold uppercase tracking-[0.16em] text-primary-700">Votre sélection</p><h2 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-950">Des adresses à explorer</h2></div>
         {recommendations.length === 0 ? <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">Aucune adresse ne correspond pour l’instant. Essayez une autre envie ou un autre quartier.</div> : (
           <div className="mt-8 grid gap-5 lg:grid-cols-3">{recommendations.map((place) => (
             <article key={place.id} className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-soft transition hover:-translate-y-1 hover:shadow-medium">
