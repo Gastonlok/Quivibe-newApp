@@ -1,5 +1,6 @@
 export const AMENITY_VALUES = [
   "BILLIARD",
+  "POOL",
   "KARAOKE",
   "PARKING",
   "TERRACE",
@@ -13,6 +14,7 @@ export type Amenity = (typeof AMENITY_VALUES)[number];
 
 export const AMENITY_LABELS: Record<Amenity, string> = {
   BILLIARD: "Billard",
+  POOL: "Piscine",
   KARAOKE: "Karaoké",
   PARKING: "Parking",
   TERRACE: "Terrasse",

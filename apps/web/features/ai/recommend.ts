@@ -6,6 +6,7 @@ const premiumWords = ["chic", "luxe", "haut de gamme", "premium", "romantique", 
 const livelyWords = ["sortir", "soir", "fete", "fête", "ambiance", "musique", "bar", "amis"];
 const amenityMatchers = [
   { amenity: "BILLIARD", pattern: /b+illard/ },
+  { amenity: "POOL", pattern: /piscine|pool/ },
   { amenity: "KARAOKE", pattern: /karaoke/ },
   { amenity: "PARKING", pattern: /parking/ },
   { amenity: "TERRACE", pattern: /terrasse/ },
