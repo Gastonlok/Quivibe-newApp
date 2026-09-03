@@ -1,138 +1,173 @@
-"use client";
-
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
-  Shield, Users, Store, Star,
-  MessageSquare, AlertTriangle, Activity
+  AlertTriangle,
+  CalendarCheck2,
+  MessageSquare,
+  Shield,
+  Store,
+  Users,
 } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-// ✅ Ajouter le type pour les couleurs
-type ColorKey = "blue" | "green" | "yellow" | "purple" | "red";
-type ActionColorKey = "primary" | "yellow" | "red";
+export const dynamic = "force-dynamic";
 
-export default function AdminDashboard() {
-  const stats = {
-    totalUsers: 1250,
-    totalPlaces: 245,
-    totalReviews: 1890,
-    pendingPlaces: 12,
-    pendingReviews: 8,
-    reportedReviews: 5,
-    activeUsers: 340,
-    conversionRate: 15.2
-  };
+export default async function AdminDashboard() {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") redirect("/");
+
+  const [
+    totalUsers,
+    totalPlaces,
+    totalReviews,
+    totalReservations,
+    pendingPlaces,
+    pendingReviews,
+    pendingOwnerRequests,
+    confirmedReservations,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.place.count(),
+    prisma.review.count(),
+    prisma.reservation.count(),
+    prisma.place.count({ where: { status: "PENDING" } }),
+    prisma.review.count({ where: { status: "PENDING" } }),
+    prisma.ownerRequest.count({ where: { status: "PENDING" } }),
+    prisma.reservation.count({ where: { status: "CONFIRMED" } }),
+  ]);
+
+  const cards = [
+    {
+      label: "Utilisateurs",
+      value: totalUsers,
+      detail: "comptes enregistrés",
+      icon: Users,
+      href: "/admin/users",
+    },
+    {
+      label: "Établissements",
+      value: totalPlaces,
+      detail: `${pendingPlaces} en attente`,
+      icon: Store,
+      href: "/admin/places",
+    },
+    {
+      label: "Avis",
+      value: totalReviews,
+      detail: `${pendingReviews} à modérer`,
+      icon: MessageSquare,
+      href: "/admin/reviews",
+    },
+    {
+      label: "Réservations",
+      value: totalReservations,
+      detail: `${confirmedReservations} confirmées`,
+      icon: CalendarCheck2,
+      href: "/owner/reservations",
+    },
+  ];
 
   return (
-    <div>
-      <div className="mb-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Shield className="w-6 h-6 text-primary-500" />
-              Administration
-            </h1>
-            <p className="text-gray-500">Gérez votre plateforme Quivibe</p>
-          </div>
-          <span className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-            Plateforme active
-          </span>
+    <main>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-primary-700">
+            Pilotage
+          </p>
+          <h1 className="mt-2 flex items-center gap-3 text-3xl font-extrabold tracking-tight text-gray-950">
+            <Shield className="h-7 w-7 text-primary-600" />
+            Administration Quivibe
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Indicateurs calculés directement à partir de la base de données.
+          </p>
         </div>
+        <span className="rounded-full bg-primary-50 px-4 py-2 text-sm font-extrabold text-primary-700">
+          Plateforme active
+        </span>
       </div>
 
-      {(stats.pendingPlaces > 0 || stats.pendingReviews > 0) && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+      {(pendingPlaces > 0 || pendingReviews > 0 || pendingOwnerRequests > 0) && (
+        <section className="mb-7 rounded-3xl border border-amber-200 bg-amber-50 p-5">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
             <div>
-              <p className="font-medium text-yellow-800">Action requise</p>
-              <p className="text-sm text-yellow-700">
-                {stats.pendingPlaces} établissements et {stats.pendingReviews} avis en attente de modération.
+              <h2 className="font-extrabold text-amber-900">Actions requises</h2>
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                {pendingPlaces} établissement{pendingPlaces > 1 ? "s" : ""}, {pendingReviews} avis et {pendingOwnerRequests} demande{pendingOwnerRequests > 1 ? "s" : ""} propriétaire en attente.
               </p>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <AdminStatCard icon={Users} label="Utilisateurs" value={stats.totalUsers} change="+12%" color="blue" subtitle={`${stats.activeUsers} actifs`} />
-        <AdminStatCard icon={Store} label="Établissements" value={stats.totalPlaces} change="+8%" color="green" subtitle={`${stats.pendingPlaces} en attente`} />
-        <AdminStatCard icon={Star} label="Avis" value={stats.totalReviews} change="+15%" color="yellow" subtitle={`${stats.pendingReviews} à modérer`} />
-        <AdminStatCard icon={Activity} label="Taux de conversion" value={stats.conversionRate + "%"} change="+2.5%" color="purple" />
-      </div>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map(({ label, value, detail, icon: Icon, href }) => (
+          <Link
+            key={label}
+            href={href}
+            className="rounded-3xl border border-gray-200 bg-white p-5 shadow-soft transition hover:-translate-y-1 hover:border-primary-200 hover:shadow-medium"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+              <Icon className="h-5 w-5" />
+            </div>
+            <p className="mt-5 text-3xl font-extrabold tracking-tight text-gray-950">
+              {value.toLocaleString("fr-FR")}
+            </p>
+            <p className="mt-1 font-extrabold text-gray-800">{label}</p>
+            <p className="mt-1 text-sm text-gray-500">{detail}</p>
+          </Link>
+        ))}
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <QuickAction icon={MessageSquare} label="Modérer les avis" count={stats.pendingReviews} color="yellow" href="/admin/reviews" />
-        <QuickAction icon={AlertTriangle} label="Signalements" count={stats.reportedReviews} color="red" href="/admin/reports" />
-      </div>
-    </div>
+      <section className="mt-8 grid gap-4 md:grid-cols-3">
+        <QuickLink
+          href="/admin/owner-requests"
+          title="Demandes propriétaires"
+          count={pendingOwnerRequests}
+          icon={Store}
+        />
+        <QuickLink
+          href="/admin/places"
+          title="Établissements à valider"
+          count={pendingPlaces}
+          icon={AlertTriangle}
+        />
+        <QuickLink
+          href="/admin/reviews"
+          title="Avis à modérer"
+          count={pendingReviews}
+          icon={MessageSquare}
+        />
+      </section>
+    </main>
   );
 }
 
-// ✅ Composant avec typage explicite
-function AdminStatCard({
-  icon: Icon,
-  label,
-  value,
-  change,
-  color,
-  subtitle
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  change: string;
-  color: ColorKey;
-  subtitle?: string;
-}) {
-  const colors: Record<ColorKey, string> = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    yellow: "bg-yellow-50 text-yellow-600",
-    purple: "bg-purple-50 text-purple-600",
-    red: "bg-red-50 text-red-600",
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className={`p-2 rounded-lg ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">{change}</span>
-      </div>
-      <p className="text-2xl font-bold text-gray-900 mt-3">{value}</p>
-      <p className="text-sm text-gray-500">{label}</p>
-      {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
-    </div>
-  );
-}
-
-// ✅ Composant avec typage explicite
-function QuickAction({
-  icon: Icon,
-  label,
+function QuickLink({
+  href,
+  title,
   count,
-  color,
-  href
+  icon: Icon,
 }: {
-  icon: React.ElementType;
-  label: string;
-  count: number;
-  color: ActionColorKey;
   href: string;
+  title: string;
+  count: number;
+  icon: React.ElementType;
 }) {
-  const colors: Record<ActionColorKey, string> = {
-    primary: "bg-primary-50 hover:bg-primary-100 text-primary-600",
-    yellow: "bg-yellow-50 hover:bg-yellow-100 text-yellow-600",
-    red: "bg-red-50 hover:bg-red-100 text-red-600",
-  };
-
   return (
-    <a href={href} className={`p-4 rounded-xl ${colors[color]} transition-colors text-left block`}>
-      <div className="flex items-center justify-between">
-        <Icon className="w-5 h-5" />
-        {count > 0 && <span className="bg-white px-2 py-0.5 rounded-full text-xs font-semibold">{count}</span>}
-      </div>
-      <p className="font-medium mt-2">{label}</p>
-    </a>
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-3xl border border-gray-200 bg-white p-5 shadow-soft hover:border-primary-300"
+    >
+      <span className="flex items-center gap-3 font-extrabold text-gray-900">
+        <Icon className="h-5 w-5 text-primary-600" />
+        {title}
+      </span>
+      <span className="rounded-full bg-primary-50 px-3 py-1 text-sm font-extrabold text-primary-700">
+        {count}
+      </span>
+    </Link>
   );
 }

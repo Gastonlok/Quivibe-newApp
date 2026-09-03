@@ -18,8 +18,6 @@ Toute la documentation produit et technique vit dans `docs/` :
 | [`docs/design-system.md`](./docs/design-system.md) | Couleurs, typographie, composants UI |
 | [`docs/api.md`](./docs/api.md) | Contrat des Server Actions par domaine |
 | [`docs/deployment.md`](./docs/deployment.md) | Procédure de déploiement |
-| [`docs/roadmap.md`](./docs/roadmap.md) | Roadmap détaillée par sprint |
-| [`docs/backlog.md`](./docs/backlog.md) | Backlog produit |
 
 ---
 
@@ -29,7 +27,7 @@ Toute la documentation produit et technique vit dans `docs/` :
 - **Langage** : TypeScript
 - **Base de données** : PostgreSQL
 - **ORM** : Prisma
-- **UI** : shadcn/ui + Tailwind CSS
+- **UI** : Tailwind CSS, composants React et identité Manrope/orange Quivibe
 - **Auth** : Auth.js
 - **Validation** : Zod
 - **Formulaires** : React Hook Form
@@ -75,21 +73,54 @@ Le détail de la structure de `apps/web` est décrit dans [`docs/architecture.md
 git clone https://github.com/<organisation>/quivibe.git
 cd quivibe
 
-# Installer les dépendances
-pnpm install
+# Facultatif : démarrer PostgreSQL localement avec Docker
+# docker compose up -d postgres
+
+# Activer pnpm avec Corepack
+corepack enable
+
+# Installer exactement les versions verrouillées
+pnpm install --frozen-lockfile
 
 # Configurer les variables d'environnement
 cp apps/web/.env.example apps/web/.env
 # renseigner DATABASE_URL, secrets Auth.js, clés Cloudinary...
 
-# Appliquer les migrations Prisma
-pnpm --filter web prisma migrate dev
+# Générer le client Prisma et appliquer les migrations
+pnpm --filter web prisma generate
+pnpm --filter web prisma migrate deploy
+
+# Facultatif : charger les données de démonstration
+pnpm --filter web prisma:seed
 
 # Lancer le serveur de développement
 pnpm dev
 ```
 
-L'application est ensuite disponible sur `http://localhost:3000`.
+L'application est ensuite disponible sur l'URL exacte affichée par Next.js. Une procédure PowerShell détaillée est fournie dans [`INSTALLATION-WINDOWS.md`](./INSTALLATION-WINDOWS.md).
+
+## Tests
+
+```bash
+pnpm --filter web test
+pnpm --filter web test:e2e
+```
+
+Les tests E2E nécessitent Chromium: `pnpm --filter web exec playwright install chromium`. Ils utilisent le compte administrateur de démonstration par défaut; en dehors de cet environnement, renseignez `E2E_ADMIN_EMAIL` et `E2E_ADMIN_PASSWORD`.
+
+---
+
+## 🍽️ Réservations
+
+Le parcours de réservation comprend :
+
+- les créneaux disponibles selon la capacité de l’établissement ;
+- une demande ou une confirmation automatique ;
+- l’espace client **Mes réservations** ;
+- l’annulation des réservations futures ;
+- l’espace propriétaire de confirmation, annulation, clôture et suivi des absences.
+
+La migration PostgreSQL de référence se trouve dans `apps/web/prisma/migrations/20260826010000_postgresql_baseline/`.
 
 ---
 
@@ -133,12 +164,6 @@ chore: mise à jour des dépendances
 2. Développer en suivant l'organisation par feature décrite dans `docs/architecture.md`.
 3. S'assurer que le lint et le build passent (`pnpm lint`, `pnpm build`).
 4. Ouvrir une pull request vers `develop` avec une description claire.
-
----
-
-## 🗺️ Roadmap
-
-Voir [`docs/roadmap.md`](./docs/roadmap.md) pour le détail sprint par sprint. Aperçu général dans [`docs/prd.md`](./docs/prd.md#12-roadmap-aperçu).
 
 ---
 

@@ -7,43 +7,43 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
+    // Auth.js prefixes the session cookie with __Secure- in production.
+    secureCookie: process.env.NODE_ENV === "production",
   });
 
-  console.log("🔐 ===== MIDDLEWARE ===== 🔐");
-  console.log("🔐 Path:", path);
-  console.log("🔐 Token:", token);
-  console.log("🔐 Role:", token?.role);
-
-  // ============================================
-  // ROUTES ADMIN
-  // ============================================
   if (path.startsWith("/admin")) {
     if (!token) {
-      console.log("⛔ Non connecté → /login");
-      return NextResponse.redirect(new URL("/login", request.url));
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", path);
+      return NextResponse.redirect(loginUrl);
     }
     if (token.role !== "ADMIN") {
-      console.log("⛔ Pas admin → /");
       return NextResponse.redirect(new URL("/", request.url));
     }
-    console.log("✅ Admin autorisé");
-    return NextResponse.next();
   }
 
-  // ============================================
-  // ROUTES OWNER
-  // ============================================
-  if (path.startsWith("/owner")) {
+  const publicOwnerRoutes = ["/owner/login", "/owner/register", "/owner/pricing"];
+  const isPrivateOwnerRoute =
+    path.startsWith("/owner") &&
+    !publicOwnerRoutes.some((route) => path === route || path.startsWith(`${route}/`));
+
+  if (isPrivateOwnerRoute) {
     if (!token) {
-      console.log("⛔ Non connecté → /login");
-      return NextResponse.redirect(new URL("/login", request.url));
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", path);
+      return NextResponse.redirect(loginUrl);
     }
     if (token.role !== "OWNER" && token.role !== "ADMIN") {
-      console.log("⛔ Pas owner → /");
       return NextResponse.redirect(new URL("/", request.url));
     }
-    console.log("✅ Owner autorisé");
-    return NextResponse.next();
+  }
+
+  if (["/favorites", "/profile", "/reservations"].some((route) => path.startsWith(route))) {
+    if (!token) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", path);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   return NextResponse.next();
@@ -53,7 +53,8 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/owner/:path*",
-    "/favorites",
-    "/profile",
+    "/favorites/:path*",
+    "/profile/:path*",
+    "/reservations/:path*",
   ],
 };

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  Shield, Users, Store, Star, Settings, LogOut, BarChart3,
-  MessageSquare, Bell, AlertTriangle, Building2
+  Shield, Users, Store, Star, LogOut, BarChart3,
+  Bell, AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 
 export default function AdminLayout({
   children,
@@ -19,7 +20,6 @@ export default function AdminLayout({
     if (pathname.includes("/admin/places")) return "places";
     if (pathname.includes("/admin/reviews")) return "reviews";
     if (pathname.includes("/admin/owner-requests")) return "owner-requests";
-    if (pathname.includes("/admin/settings")) return "settings";
     return "overview";
   });
 
@@ -72,7 +72,6 @@ function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiv
     { id: "places", label: "Établissements", icon: Store, href: "/admin/places" },
     { id: "reviews", label: "Avis", icon: Star, href: "/admin/reviews" },
     { id: "owner-requests", label: "Demandes", icon: AlertTriangle, href: "/admin/owner-requests" },
-    { id: "settings", label: "Paramètres", icon: Settings, href: "/admin/settings" },
   ];
 
   return (
@@ -98,7 +97,11 @@ function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiv
           })}
         </div>
         <div className="border-t border-gray-200 mt-4 pt-4">
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
             <LogOut className="w-4 h-4" />
             Déconnexion
           </button>

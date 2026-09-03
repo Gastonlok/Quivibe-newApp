@@ -1,10 +1,10 @@
 // apps/web/lib/auth.ts
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { CredentialsSignin } from "next-auth";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/features/auth/schema";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 
 // ✅ Déclaration des types pour les rôles
 declare module "next-auth" {
@@ -18,12 +18,20 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: string;
+      image?: string | null;
     };
   }
 }
 
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = "email-not-verified";
+}
+
+class AuthServiceUnavailableError extends CredentialsSignin {
+  code = "auth-service-unavailable";
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 jours
@@ -60,6 +68,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
+          if (user.role === "USER" && !user.emailVerified) {
+            throw new EmailNotVerifiedError();
+          }
+
           // Vérification du mot de passe
           const passwordValid = await bcrypt.compare(password, user.passwordHash);
           if (!passwordValid) {
@@ -74,8 +86,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             role: user.role,
           };
         } catch (error) {
+          if (error instanceof EmailNotVerifiedError) {
+            throw error;
+          }
+
           console.error("Erreur d'authentification:", error);
-          return null;
+          throw new AuthServiceUnavailableError();
         }
       },
     }),
@@ -90,8 +106,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
+        const currentUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { id: true, name: true, email: true, role: true, image: true },
+        });
+
+        if (currentUser) {
+          session.user.id = currentUser.id;
+          session.user.name = currentUser.name;
+          session.user.email = currentUser.email;
+          session.user.role = currentUser.role;
+          session.user.image = currentUser.image;
+        }
       }
       return session;
     },

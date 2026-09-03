@@ -17,7 +17,7 @@ Ce document décrit la procédure de déploiement de Quivibe en phase MVP : envi
 
 | Environnement | Branche | URL | Objectif |
 |---|---|---|---|
-| Développement local | — | `localhost:3000` | Développement quotidien |
+| Développement local | — | Port attribué par Next.js (souvent `localhost:3000`) | Développement quotidien |
 | Preview | `feature/*` (via PR) | URL générée automatiquement par pull request | Revue de chaque feature avant merge |
 | Staging | `develop` | `staging.quivibe.app` (à confirmer) | Validation avant mise en production |
 | Production | `main` | `quivibe.app` (à confirmer) | Environnement public |
@@ -33,8 +33,8 @@ Fichier de référence : `apps/web/.env.example`, à copier vers `.env` en local
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Chaîne de connexion PostgreSQL |
-| `NEXTAUTH_URL` | URL publique de l'application (requis par Auth.js) |
-| `NEXTAUTH_SECRET` | Secret de signature des sessions |
+| `AUTH_URL` | URL publique de l'application (requis par Auth.js) |
+| `AUTH_SECRET` | Secret de signature des sessions |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Identifiants du fournisseur OAuth Google (si activé) |
 | `CLOUDINARY_CLOUD_NAME` | Nom du compte Cloudinary |
 | `CLOUDINARY_API_KEY` | Clé API Cloudinary |

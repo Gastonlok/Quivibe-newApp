@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
+  "buildCommand": "pnpm --filter web exec prisma migrate deploy && pnpm --filter web build",
+  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
   "framework": "nextjs",
   "outputDirectory": ".next"
 }

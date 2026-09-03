@@ -2,19 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-
 @layer base {
+  * {
+    border-color: var(--gray-200);
+  }
+
   html {
-    font-family: var(--font-inter), system-ui, sans-serif;
+    scroll-behavior: smooth;
+    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-gray-50 text-gray-950 antialiased;
+    letter-spacing: -0.01em;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.035em;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(223, 119, 8, 0.32);
+    outline-offset: 2px;
   }
 }
 
 @layer components {
   .container {
-    @apply mx-auto px-4 max-w-7xl;
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@keyframes gallery-fade {
+  from {
+    opacity: 0.65;
+    transform: scale(1.02);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }

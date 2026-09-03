@@ -13,6 +13,8 @@ import { Sparkles, Trophy, Star } from "lucide-react";
 // ============================================
 // PAGE PRINCIPALE (SERVER COMPONENT)
 // ============================================
+
+export const dynamic = "force-dynamic";
 export default async function HomePage({
   searchParams,
 }: {
@@ -79,7 +81,7 @@ export default async function HomePage({
                     title="Les plus cotés"
                     icon={<Trophy className="w-6 h-6 text-yellow-500" />}
                     items={topRated}
-                    viewAllLink="/top-rated"
+                    viewAllLink="/discover"
                     itemsPerView={4}
                   />
                 </div>
@@ -94,7 +96,7 @@ export default async function HomePage({
                     title="Nos recommandations"
                     icon={<Sparkles className="w-6 h-6 text-primary-500" />}
                     items={recommendations}
-                    viewAllLink="/recommendations"
+                    viewAllLink="/discover"
                     itemsPerView={4}
                   />
                 </div>

@@ -18,11 +18,16 @@ export default function LoginForm() {
     email: "",
     password: "",
   });
+  const requestedCallback = searchParams.get("callbackUrl");
+  const callbackUrl =
+    requestedCallback?.startsWith("/") && !requestedCallback.startsWith("//")
+      ? requestedCallback
+      : "/";
 
   useEffect(() => {
     const registered = searchParams.get("registered");
     if (registered === "true") {
-      setSuccessMessage("✅ Compte créé avec succès ! Connectez-vous maintenant.");
+      setSuccessMessage("Un e-mail de confirmation a été envoyé dans votre boîte mail. Veuillez confirmer votre adresse e-mail avant de vous connecter.");
     }
   }, [searchParams]);
 
@@ -36,20 +41,27 @@ export default function LoginForm() {
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
+        callbackUrl,
         redirect: false,
       });
 
-      if (result?.error) {
-        setError("Email ou mot de passe incorrect");
+      if (!result || (typeof result !== "string" && result.error)) {
+        const errorCode = typeof result === "string" ? undefined : result?.code ?? result?.error;
+        const errorMessage =
+          errorCode === "email-not-verified"
+            ? "Confirmez votre adresse email avant de vous connecter."
+            : errorCode === "auth-service-unavailable"
+              ? "Le service de connexion est indisponible. Réessayez dans quelques instants."
+              : "Email ou mot de passe incorrect";
+
+        setError(errorMessage);
         setLoading(false);
         return;
       }
 
       setSuccessMessage("✅ Connexion réussie ! Redirection...");
-      setTimeout(() => {
-        router.push("/");
-        router.refresh();
-      }, 1500);
+      router.replace(callbackUrl);
+      router.refresh();
     } catch (error) {
       setError("Une erreur est survenue");
       setLoading(false);
@@ -74,12 +86,13 @@ export default function LoginForm() {
               <input
                 type="email"
                 required
-                placeholder="vous@email.com"
+                placeholder="grace.mbala@exemple.cd"
                 className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
+            <Link href="/forgot-password" className="mt-2 block text-right text-sm font-bold text-primary-700 hover:text-primary-800">Mot de passe oublie ?</Link>
           </div>
 
           <div>
@@ -126,7 +139,10 @@ export default function LoginForm() {
 
         <p className="text-center text-sm text-gray-600">
           Pas encore de compte ?{" "}
-          <Link href="/register" className="text-primary-500 hover:text-primary-600 font-medium">
+          <Link
+            href={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+            className="text-primary-500 hover:text-primary-600 font-medium"
+          >
             S'inscrire
           </Link>
         </p>

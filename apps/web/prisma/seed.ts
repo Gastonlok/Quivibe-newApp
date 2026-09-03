@@ -474,41 +474,48 @@ async function main() {
   console.log(`✅ ${categories.length} catégories créées`);
 
   // 2. Créer les utilisateurs
-  const password = await bcrypt.hash('admin123', 10);
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+    throw new Error('Le seed de démonstration est désactivé en production.');
+  }
+  const demoPassword = process.env.SEED_PASSWORD || 'QuivibeDemo2026!';
+  const password = await bcrypt.hash(demoPassword, 10);
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@quivibe.com' },
-    update: {},
+    update: { emailVerified: new Date() },
     create: {
       name: 'Admin Quivibe',
       email: 'admin@quivibe.com',
       passwordHash: password,
       role: 'ADMIN',
+      emailVerified: new Date(),
     },
   });
   console.log('✅ Admin créé');
 
   const owner = await prisma.user.upsert({
     where: { email: 'owner@quivibe.com' },
-    update: {},
+    update: { emailVerified: new Date() },
     create: {
       name: 'Propriétaire Test',
       email: 'owner@quivibe.com',
       passwordHash: password,
       role: 'OWNER',
       ownerStatus: 'APPROVED',
+      emailVerified: new Date(),
     },
   });
   console.log('✅ Owner créé');
 
   const user = await prisma.user.upsert({
     where: { email: 'user@quivibe.com' },
-    update: {},
+    update: { emailVerified: new Date() },
     create: {
       name: 'Utilisateur Test',
       email: 'user@quivibe.com',
       passwordHash: password,
       role: 'USER',
+      emailVerified: new Date(),
     },
   });
   console.log('✅ Utilisateur créé');
@@ -594,12 +601,13 @@ async function main() {
     });
 
     if (place) {
-      // 2-3 avis par établissement
-      const numReviews = Math.floor(Math.random() * 2) + 2;
-      for (let i = 0; i < numReviews; i++) {
-        const rating = Math.floor(Math.random() * 2) + 4; // 4 ou 5
+      const existingReview = await prisma.review.findFirst({
+        where: { authorId: user.id, placeId: place.id },
+        select: { id: true },
+      });
+      if (!existingReview) {
+        const rating = Math.floor(Math.random() * 2) + 4;
         const comment = reviewComments[Math.floor(Math.random() * reviewComments.length)];
-
         await prisma.review.create({
           data: {
             rating,
@@ -610,16 +618,121 @@ async function main() {
           },
         });
       }
-      console.log(`✅ Avis créés pour ${place.name}`);
+      console.log(`✅ Avis vérifié pour ${place.name}`);
     }
+  }
+
+  // 5. Créer des événements futurs de démonstration
+  const eventTemplates = [
+    {
+      title: 'Soirée Jazz au Jardin',
+      description: 'Une soirée jazz en plein air avec des artistes locaux et un menu spécial.',
+      placeSlug: 'le-jardin-des-saveurs',
+      daysFromNow: 3,
+      hourUtc: 18,
+      durationHours: 3,
+      image: 'https://images.unsplash.com/photo-1509824227185-9c5a01ceba0d?w=1200&h=800&fit=crop',
+    },
+    {
+      title: 'Dîner découverte du Chef',
+      description: 'Un menu dégustation pensé autour des produits congolais de saison.',
+      placeSlug: 'la-table-du-chef',
+      daysFromNow: 7,
+      hourUtc: 19,
+      durationHours: 3,
+      image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&h=800&fit=crop',
+    },
+    {
+      title: 'Brunch dominical',
+      description: 'Buffet, musique douce et espace convivial pour les familles et les amis.',
+      placeSlug: 'au-petit-marche',
+      daysFromNow: 10,
+      hourUtc: 10,
+      durationHours: 4,
+      image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?w=1200&h=800&fit=crop',
+    },
+    {
+      title: 'Sunset sur le fleuve',
+      description: 'Cocktails signature, coucher de soleil et sélection musicale au bord du fleuve.',
+      placeSlug: 'la-terrasse-du-congo',
+      daysFromNow: 14,
+      hourUtc: 16,
+      durationHours: 4,
+      image: 'https://images.unsplash.com/photo-1519671282429-b44660ead0a7?w=1200&h=800&fit=crop',
+    },
+  ];
+
+  for (const eventData of eventTemplates) {
+    const place = await prisma.place.findUnique({
+      where: { slug: eventData.placeSlug },
+      select: { id: true },
+    });
+    if (!place) continue;
+
+    const existingEvent = await prisma.event.findFirst({
+      where: { title: eventData.title, placeId: place.id },
+      select: { id: true },
+    });
+    if (existingEvent) continue;
+
+    const startDate = new Date();
+    startDate.setUTCDate(startDate.getUTCDate() + eventData.daysFromNow);
+    startDate.setUTCHours(eventData.hourUtc, 0, 0, 0);
+    const endDate = new Date(
+      startDate.getTime() + eventData.durationHours * 60 * 60 * 1000,
+    );
+
+    await prisma.event.create({
+      data: {
+        title: eventData.title,
+        description: eventData.description,
+        startDate,
+        endDate,
+        status: 'APPROVED',
+        organizerId: owner.id,
+        placeId: place.id,
+        media: {
+          create: {
+            url: eventData.image,
+            altText: eventData.title,
+          },
+        },
+      },
+    });
+  }
+  console.log(`✅ ${eventTemplates.length} événements de démonstration vérifiés`);
+
+  // 6. Créer une réservation future de démonstration
+  const demoPlace = await prisma.place.findUnique({
+    where: { slug: 'le-jardin-des-saveurs' },
+    select: { id: true },
+  });
+  if (demoPlace) {
+    const dateTime = new Date();
+    dateTime.setUTCDate(dateTime.getUTCDate() + 2);
+    dateTime.setUTCHours(18, 30, 0, 0);
+
+    await prisma.reservation.upsert({
+      where: { reference: 'QV-DEMO-0001' },
+      update: { dateTime },
+      create: {
+        reference: 'QV-DEMO-0001',
+        dateTime,
+        partySize: 2,
+        status: 'CONFIRMED',
+        phone: '+243 812 000 001',
+        customerId: user.id,
+        placeId: demoPlace.id,
+      },
+    });
   }
 
   console.log(`\n🎉 ${createdCount} établissements créés avec succès !`);
   console.log('📸 Images réelles intégrées !');
   console.log('\n🔑 Comptes de test:');
-  console.log('  Admin: admin@quivibe.com / admin123');
-  console.log('  Owner: owner@quivibe.com / admin123');
-  console.log('  User: user@quivibe.com / admin123');
+  console.log(`  Admin: admin@quivibe.com / ${demoPassword}`);
+  console.log(`  Owner: owner@quivibe.com / ${demoPassword}`);
+  console.log(`  User: user@quivibe.com / ${demoPassword}`);
 }
 
 main()

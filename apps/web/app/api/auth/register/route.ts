@@ -3,17 +3,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/features/auth/schema";
 import bcrypt from "bcryptjs";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendEmailVerificationEmail } from "@/lib/email";
+import { createAccountToken } from "@/lib/account-tokens";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log("📝 Tentative d'inscription:", body.email);
 
     const parsed = registerSchema.safeParse(body);
 
     if (!parsed.success) {
-      console.log("❌ Validation échouée:", parsed.error.errors);
       return NextResponse.json(
         { error: parsed.error.errors[0].message },
         { status: 400 }
@@ -28,7 +27,6 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      console.log("⚠️ Utilisateur déjà existant:", email);
       return NextResponse.json(
         { error: "Un compte existe déjà avec cet email" },
         { status: 400 }
@@ -48,22 +46,23 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log("✅ Utilisateur créé:", user.email);
 
     // ✅ ENVOYER L'EMAIL DE BIENVENUE
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      console.log("📧 Envoi de l'email de bienvenue à:", email);
 
-      const result = await sendWelcomeEmail(email, name, appUrl);
+      const verificationToken = await createAccountToken("email-verification", email);
+      const result = await sendEmailVerificationEmail(
+        email,
+        name,
+        `${appUrl}/api/auth/verify-email?token=${encodeURIComponent(verificationToken)}`,
+      );
 
-      if (result.success) {
-        console.log("✅ Email de bienvenue envoyé avec succès !");
-      } else {
-        console.error("❌ Erreur lors de l'envoi de l'email:", result.error);
+      if (!result.success && !("skipped" in result && result.skipped)) {
+        console.error("Erreur lors de l'envoi de l'email de verification:", result.error);
       }
     } catch (emailError) {
-      console.error("❌ Erreur lors de l'envoi de l'email:", emailError);
+      console.error("Erreur lors de l'envoi de l'email:", emailError);
       // On continue même si l'email échoue
     }
 
@@ -80,7 +79,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("❌ Erreur d'inscription:", error);
+    console.error("Erreur d'inscription:", error);
     return NextResponse.json(
       { error: "Une erreur est survenue lors de l'inscription" },
       { status: 500 }

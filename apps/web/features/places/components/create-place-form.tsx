@@ -8,10 +8,10 @@ import { createPlaceAction } from "@/features/places/actions";
 
 interface CreatePlaceFormProps {
   onSuccess?: () => void;
-   categories?: { id: string; name: string; slug: string }[];
+  categories?: { id: string; name: string; slug: string }[];
 }
 
-export function CreatePlaceForm({ onSuccess }: CreatePlaceFormProps) {
+export function CreatePlaceForm({ onSuccess, categories = [] }: CreatePlaceFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -22,6 +22,7 @@ export function CreatePlaceForm({ onSuccess }: CreatePlaceFormProps) {
     neighborhood: "",
     priceRange: "2",
     phone: "",
+    categoryId: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,6 +118,7 @@ export function CreatePlaceForm({ onSuccess }: CreatePlaceFormProps) {
           Quartier
         </label>
         <select
+          required
           className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           value={formData.neighborhood}
           onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
@@ -130,6 +132,25 @@ export function CreatePlaceForm({ onSuccess }: CreatePlaceFormProps) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
+          Catégorie
+        </label>
+        <select
+          required
+          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          value={formData.categoryId}
+          onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+        >
+          <option value="">Sélectionner une catégorie</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Budget
         </label>
         <select
@@ -137,10 +158,10 @@ export function CreatePlaceForm({ onSuccess }: CreatePlaceFormProps) {
           value={formData.priceRange}
           onChange={(e) => setFormData({ ...formData, priceRange: e.target.value })}
         >
-          <option value="1">€ (Bon marché)</option>
-          <option value="2">€€ (Moyen)</option>
-          <option value="3">€€€ (Cher)</option>
-          <option value="4">€€€€ (Très cher)</option>
+          <option value="1">$ (Bon marché)</option>
+          <option value="2">$$ (Moyen)</option>
+          <option value="3">$$$ (Haut de gamme)</option>
+          <option value="4">$$$$ (Très haut de gamme)</option>
         </select>
       </div>
 

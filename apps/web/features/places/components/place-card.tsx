@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Star, MapPin, Utensils } from "lucide-react";
+import { CalendarCheck2, MapPin, Star, Utensils } from "lucide-react";
 import { AnimatedCard } from "@/components/animated-section";
 import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 
@@ -18,6 +18,7 @@ interface PlaceCardProps {
     priceRange: number;
     reviews?: { rating: number }[];
     isFavorite?: boolean;
+    reservationsEnabled?: boolean;
   };
 }
 
@@ -29,7 +30,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
   const foodImage = place.media[1]?.url || place.media[0]?.url || "/images/placeholder.jpg";
 
   const category = place.categories[0]?.category.name || "Établissement";
-  const priceLabels = ["€", "€€", "€€€", "€€€€"];
+  const priceLabels = ["$", "$$", "$$$", "$$$$"];
   const reviewCount = place.reviews?.length || 0;
 
   return (
@@ -127,13 +128,14 @@ export function PlaceCard({ place }: PlaceCardProps) {
             </span>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs text-green-600 font-medium">Ouvert</span>
-            </div>
-            <span className="text-xs text-gray-300">•</span>
-            <span className="text-xs text-gray-500">Bientôt disponible</span>
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
+            <span className="text-xs font-bold text-gray-500">Voir les détails</span>
+            {place.reservationsEnabled !== false && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary-700">
+                <CalendarCheck2 className="h-4 w-4" />
+                Réserver
+              </span>
+            )}
           </div>
         </div>
       </Link>

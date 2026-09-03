@@ -1,327 +1,210 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  Home,
-  MapPin,
-  Calendar,
-  User,
-  LogOut,
-  Menu,
-  X,
-  Search,
+  CalendarCheck2,
   Heart,
-  Bell,
-   Building2,  // ✅ Ajouter cette icône
-  LayoutDashboard,  // ✅ Ajouter aussi celle-ci si nécessaire
-  Sparkles,
-  Utensils,
-  Users,
+  LogOut,
+  MapPin,
+  Menu,
+  Search,
   Shield,
-  Store
+  Store,
+  UserRound,
+  X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useSession, signOut } from "next-auth/react";
-import { useEffect} from "react";
-import { getFavoriteCount } from "@/features/favorites/actions";
+import { signOut, useSession } from "next-auth/react";
+
+const publicLinks = [
+  { href: "/discover", label: "Restaurants", icon: Search },
+  { href: "/map", label: "Carte", icon: MapPin },
+  { href: "/events", label: "Événements", icon: CalendarCheck2 },
+];
 
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { data: session, status } = useSession();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [favoriteCount, setFavoriteCount] = useState(0);
-  const isActive = (path: string) => pathname === path;
-  const user = session?.user;
-  const isAuthenticated = status === "authenticated";
+  const [open, setOpen] = useState(false);
+  const authenticated = status === "authenticated";
+  const role = session?.user?.role;
 
-const navLinks = [
-  { href: "/", label: "Accueil", icon: Home },
-  { href: "/discover", label: "Découvrir", icon: Sparkles },
-  { href: "/map", label: "Carte", icon: MapPin },
-  { href: "/events", label: "Événements", icon: Calendar },
-  { href: "/owners", label: "Espace pro", icon: Building2 }, // ✅ Nouveau libellé
-];
+  const accountLinks = authenticated
+    ? [
+        { href: "/reservations", label: "Mes réservations", icon: CalendarCheck2 },
+        { href: "/favorites", label: "Favoris", icon: Heart },
+      ]
+    : [];
 
+  const dashboard =
+    role === "ADMIN"
+      ? { href: "/admin/dashboard", label: "Administration", icon: Shield }
+      : role === "OWNER"
+        ? { href: "/owner/dashboard", label: "Espace pro", icon: Store }
+        : null;
 
-  // Dashboard links selon le rôle
-  const getDashboardLink = () => {
-    if (user?.role === "ADMIN") return { href: "/admin/dashboard", label: "Admin", icon: Shield };
-    if (user?.role === "OWNER") return { href: "/owner/dashboard", label: "Dashboard", icon: Store };
-    return null;
-  };
-
-  const dashboardLink = getDashboardLink();
-
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" });
-  };
+  const links = [...publicLinks, ...accountLinks];
 
   return (
-    <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 shadow-sm">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-primary-200/50 transition-shadow">
-              <Utensils className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">
-                Quivibe
-              </span>
-              <span className="hidden md:inline-block text-[10px] font-medium text-primary-500 ml-1 px-1.5 py-0.5 bg-primary-50 rounded-full">
-                .cd
-              </span>
-            </div>
-          </Link>
+    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur">
+      <div className="container flex h-18 items-center justify-between py-3">
+        <Link href="/" className="relative h-12 w-40 overflow-hidden rounded-lg" onClick={() => setOpen(false)}>
+          <Image
+            src="/brand/quivibe-logo.png"
+            alt="Quivibe - Ne cherche plus, vibe ou tu veux"
+            fill
+            priority
+            sizes="160px"
+            className="object-cover object-center"
+          />
+        </Link>
 
-          {/* Navigation Desktop */}
-          <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              const active = isActive(link.href);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`relative px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${
-                    active
-                      ? "text-primary-600 bg-primary-50"
-                      : "text-gray-600 hover:text-primary-600 hover:bg-gray-50"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                  {active && (
-                    <motion.div
-                      layoutId="navbar-indicator"
-                      className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-0.5 bg-primary-500 rounded-full"
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            {/* Dashboard link pour admin/owner */}
-            {dashboardLink && (
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Navigation principale">
+          {links.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return (
               <Link
-                href={dashboardLink.href}
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-50 text-primary-600 rounded-full hover:bg-primary-100 transition-colors"
+                key={href}
+                href={href}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                  active
+                    ? "bg-primary-50 text-primary-700"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-950"
+                }`}
               >
-                <dashboardLink.icon className="w-4 h-4" />
-                {dashboardLink.label}
+                <Icon className="h-4 w-4" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="hidden items-center gap-2 lg:flex">
+          {dashboard && (
+            <Link
+              href={dashboard.href}
+              className="rounded-full border border-gray-300 px-4 py-2 text-sm font-extrabold text-gray-800 hover:border-primary-600 hover:text-primary-700"
+            >
+              {dashboard.label}
+            </Link>
+          )}
+
+          {authenticated ? (
+            <>
+              <span className="max-w-36 truncate px-2 text-sm font-bold text-gray-700">
+                {session?.user?.name || "Mon compte"}
+              </span>
+              <Link
+                href="/profile"
+                className="rounded-full p-2 text-gray-500 hover:bg-primary-50 hover:text-primary-700"
+                aria-label="Modifier mon profil"
+              >
+                <UserRound className="h-5 w-5" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="rounded-full p-2 text-gray-500 hover:bg-red-50 hover:text-red-700"
+                aria-label="Se déconnecter"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="rounded-full px-4 py-2 text-sm font-extrabold text-gray-800 hover:bg-gray-100"
+              >
+                Se connecter
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full bg-primary-600 px-5 py-2.5 text-sm font-extrabold text-white hover:bg-primary-700"
+              >
+                Créer un compte
+              </Link>
+            </>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="rounded-full p-2 text-gray-700 lg:hidden"
+          aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-expanded={open}
+        >
+          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+      </div>
+
+      {open && (
+        <nav className="border-t border-gray-200 bg-white px-4 py-4 lg:hidden">
+          <div className="mx-auto max-w-7xl space-y-1">
+            {links.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-extrabold text-gray-800 hover:bg-gray-100"
+              >
+                <Icon className="h-5 w-5 text-primary-700" />
+                {label}
+              </Link>
+            ))}
+            {dashboard && (
+              <Link
+                href={dashboard.href}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-extrabold text-gray-800 hover:bg-gray-100"
+              >
+                <dashboard.icon className="h-5 w-5 text-primary-700" />
+                {dashboard.label}
               </Link>
             )}
-
-            {/* Notifications */}
-            {isAuthenticated && (
-              <button className="relative p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-            )}
-
-            {/* Favoris */}
-            {isAuthenticated && (
-                          <Link
-              href="/favorites"
-              className="p-2 text-gray-500 hover:text-primary-600 transition-colors rounded-full hover:bg-gray-50 relative"
-            >
-              <Heart className="w-5 h-5" />
-              {favoriteCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {favoriteCount > 9 ? "9+" : favoriteCount}
-                </span>
-              )}
-            </Link>
-            )}
-
-            {/* Profil / Connexion */}
-            {isAuthenticated ? (
-              <div className="hidden md:flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full">
-                  <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center">
-                    <span className="text-primary-600 font-semibold text-xs">
-                      {user?.name?.charAt(0).toUpperCase() || "U"}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">
-                    {user?.name?.split(" ")[0] || "Utilisateur"}
-                  </span>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
-                  title="Déconnexion"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-            ) : (
-              <>
+            {!authenticated ? (
+              <div className="grid grid-cols-2 gap-2 pt-3">
                 <Link
                   href="/login"
-                  className="hidden md:inline-flex px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-full hover:shadow-lg hover:shadow-primary-200/50 transition-all duration-300 hover:scale-105"
+                  onClick={() => setOpen(false)}
+                  className="rounded-full border border-gray-300 px-4 py-3 text-center text-sm font-extrabold text-gray-800"
                 >
-                  Se connecter
+                  Connexion
                 </Link>
                 <Link
                   href="/register"
-                  className="hidden md:inline-flex px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                  onClick={() => setOpen(false)}
+                  className="rounded-full bg-primary-600 px-4 py-3 text-center text-sm font-extrabold text-white"
                 >
-                  S'inscrire
+                  Inscription
                 </Link>
-              </>
+              </div>
+            ) : (
+              <div className="mt-3 flex gap-2">
+                <Link
+                  href="/profile"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-center rounded-full border border-primary-200 p-3 text-primary-700"
+                  aria-label="Modifier mon profil"
+                >
+                  <UserRound className="h-5 w-5" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-red-200 px-4 py-3 text-sm font-extrabold text-red-700"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Déconnexion
+                </button>
+              </div>
             )}
-
-            {/* Menu Mobile */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 text-gray-500 hover:text-primary-600 transition-colors"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
           </div>
-        </div>
-
-        {/* Barre de recherche mobile */}
-        <AnimatePresence>
-          {isSearchOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden py-3"
-            >
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Rechercher..."
-                  className="w-full px-4 py-2.5 pl-10 rounded-full border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-gray-50 text-sm"
-                />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Menu Mobile */}
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-gray-100 py-3"
-            >
-              <div className="space-y-1">
-                {navLinks.map((link) => {
-                  const Icon = link.icon;
-                  const active = isActive(link.href);
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                        active
-                          ? "text-primary-600 bg-primary-50"
-                          : "text-gray-600 hover:text-primary-600 hover:bg-gray-50"
-                      }`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-sm font-medium">{link.label}</span>
-                      {active && (
-                        <div className="ml-auto w-1.5 h-8 bg-primary-500 rounded-full" />
-                      )}
-                    </Link>
-                  );
-                })}
-
-                {/* Dashboard link dans menu mobile */}
-                {dashboardLink && (
-                  <Link
-                    href={dashboardLink.href}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary-600 bg-primary-50"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <dashboardLink.icon className="w-5 h-5" />
-                    <span className="text-sm font-medium">{dashboardLink.label}</span>
-                  </Link>
-                )}
-
-                {/* Favoris dans menu mobile */}
-                {isAuthenticated && (
-                  <Link
-                    href="/favorites"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-gray-50 transition-colors"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Heart className="w-5 h-5" />
-                    <span className="text-sm font-medium">Mes favoris</span>
-                  </Link>
-                )}
-
-                <div className="border-t border-gray-100 my-3 pt-3">
-                  {isAuthenticated ? (
-                    <>
-                      <div className="flex items-center gap-3 px-3 py-2.5">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                          <span className="text-primary-600 font-semibold text-sm">
-                            {user?.name?.charAt(0).toUpperCase() || "U"}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">{user?.name}</p>
-                          <p className="text-xs text-gray-500">{user?.email}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors w-full"
-                      >
-                        <LogOut className="w-5 h-5" />
-                        <span className="text-sm font-medium">Déconnexion</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        href="/login"
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <User className="w-5 h-5" />
-                        <span className="text-sm font-medium">Se connecter</span>
-                      </Link>
-                      <Link
-                        href="/register"
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:text-primary-600 hover:bg-gray-50 transition-colors"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <Users className="w-5 h-5" />
-                        <span className="text-sm font-medium">S'inscrire</span>
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </nav>
+        </nav>
+      )}
+    </header>
   );
 }

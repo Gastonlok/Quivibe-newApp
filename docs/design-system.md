@@ -27,7 +27,7 @@ Quivibe doit inspirer confiance et donner envie de sortir : une esthétique mode
 
 | Rôle | Usage | Exemple de valeur |
 |---|---|---|
-| `primary` | Actions principales, liens actifs, éléments de marque | Orange chaud (#F2622E) |
+| `primary` | Actions principales, liens actifs, éléments de marque | Orange Quivibe (#F99216) |
 | `secondary` | Accents secondaires, badges, highlights | Bleu nuit (#1B2340) |
 | `accent` | Éléments d'événements / mise en avant | Jaune doré (#F5B841) |
 | `success` | Confirmations, statut "approuvé" | Vert (#2E9E5B) |
@@ -44,7 +44,7 @@ Les valeurs exactes seront définies comme variables CSS (`--primary`, `--second
 
 ## 4. Typographie
 
-- **Police principale** : une sans-serif moderne et lisible (ex. Inter ou Geist), pour les textes courants.
+- **Police principale** : **Manrope**, sans-serif moderne et lisible, pour les textes courants.
 - **Police de titres** : la même famille en graisse plus marquée (Semibold/Bold), pour garder une cohérence et limiter le poids de chargement (une seule famille de police à charger).
 
 | Niveau | Taille (desktop) | Taille (mobile) | Graisse |

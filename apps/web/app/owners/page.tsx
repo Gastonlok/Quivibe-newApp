@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users,
   TrendingUp,
@@ -30,7 +31,9 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function OwnersPage() {
+  const router = useRouter();
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     establishmentName: "",
@@ -87,6 +90,7 @@ export default function OwnersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setFormError("");
 
     try {
       const res = await fetch("/api/owners/contact", {
@@ -95,20 +99,31 @@ export default function OwnersPage() {
         body: JSON.stringify(formData),
       });
 
-      if (res.ok) {
-        setFormSubmitted(true);
-        setFormData({
-          establishmentName: "",
-          contactName: "",
-          email: "",
-          phone: "",
-          address: "",
-          establishmentType: "",
-          message: "",
-        });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        router.push("/login?callbackUrl=/owners%23contact");
+        return;
       }
+
+      if (!res.ok) {
+        setFormError(data.error || "Impossible d'envoyer la demande.");
+        return;
+      }
+
+      setFormSubmitted(true);
+      setFormData({
+        establishmentName: "",
+        contactName: "",
+        email: "",
+        phone: "",
+        address: "",
+        establishmentType: "",
+        message: "",
+      });
     } catch (error) {
       console.error("Erreur:", error);
+      setFormError("Une erreur réseau est survenue. Réessayez.");
     } finally {
       setLoading(false);
     }
@@ -304,7 +319,7 @@ export default function OwnersPage() {
                     <input
                       type="text"
                       required
-                      placeholder="Jean Dupont"
+                      placeholder="Grâce Mbala"
                       className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       value={formData.contactName}
                       onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
@@ -323,7 +338,7 @@ export default function OwnersPage() {
                     <input
                       type="email"
                       required
-                      placeholder="contact@etablissement.com"
+                      placeholder="contact@mbokaya.cd"
                       className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -401,6 +416,12 @@ export default function OwnersPage() {
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                 />
               </div>
+
+              {formError && (
+                <p role="alert" className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  {formError}
+                </p>
+              )}
 
               <button
                 type="submit"

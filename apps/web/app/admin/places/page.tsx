@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Store, Search, Loader2, Eye, CheckCircle, XCircle,
   Building2, MapPin, Star, Calendar, Filter, Trash2,
-  Clock, AlertCircle, Plus
+  Clock, AlertCircle, Plus, Pencil
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -320,6 +320,13 @@ export default function AdminPlacesPage() {
                           title="Voir la fiche"
                         >
                           <Eye className="w-4 h-4" />
+                        </Link>
+                        <Link
+                          href={`/owner/places/${place.id}/edit`}
+                          className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                          title="Modifier l'établissement"
+                        >
+                          <Pencil className="w-4 h-4" />
                         </Link>
                         <button
                           onClick={() => handleDeletePlace(place.id)}

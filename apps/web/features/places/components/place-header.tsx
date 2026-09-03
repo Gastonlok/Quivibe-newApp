@@ -1,86 +1,47 @@
-// apps/web/features/places/components/place-header.tsx
 "use client";
 
-import Image from "next/image";
-import { Star, MapPin, Phone } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Home, MapPin, Star, UtensilsCrossed } from "lucide-react";
+import { FavoriteButton } from "@/features/favorites/components/favorite-button";
 
 interface PlaceHeaderProps {
   place: {
+    id: string;
     name: string;
     averageRating: number | null;
     neighborhood: string;
     address: string;
-    phone: string | null;
-    media: { url: string; altText: string | null }[];
+    priceRange: number;
+    isFavorite: boolean;
     categories: { category: { name: string } }[];
+    reviews: { rating: number }[];
   };
 }
 
 export function PlaceHeader({ place }: PlaceHeaderProps) {
-  const mainImage = place.media[0]?.url || "/images/placeholder.jpg";
+  const categoryNames = place.categories.map(({ category }) => category.name).join(" · ");
 
   return (
-    <div className="relative">
-      {/* Image principale */}
-      <div className="relative h-64 md:h-96 rounded-xl overflow-hidden bg-gray-100">
-        <Image
-          src={mainImage}
-          alt={place.name}
-          fill
-          className="object-cover"
-          priority
-          sizes="(max-width: 768px) 100vw, 1200px"
-        />
-      </div>
+    <header>
+      <nav aria-label="Fil d'Ariane" className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-sm font-semibold text-gray-500">
+        <Link href="/" className="text-primary-700 hover:text-primary-800" aria-label="Accueil"><Home className="h-4 w-4" /></Link>
+        <ChevronRight className="h-4 w-4" />
+        <Link href="/discover" className="hover:text-gray-950">Découvrir</Link>
+        <ChevronRight className="h-4 w-4" />
+        <span className="truncate text-gray-800">{place.name}</span>
+      </nav>
 
-      {/* Infos superposées */}
-      <div className="mt-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-              {place.name}
-            </h1>
-            <div className="flex flex-wrap items-center gap-3 mt-2">
-              {/* Note */}
-              {place.averageRating !== null && (
-                <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">
-                    {place.averageRating.toFixed(1)}
-                  </span>
-                </div>
-              )}
-              {/* Catégories */}
-              <div className="flex gap-2">
-                {place.categories.map(({ category }) => (
-                  <span
-                    key={category.name}
-                    className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
-                  >
-                    {category.name}
-                  </span>
-                ))}
-              </div>
-            </div>
+      <div className="mt-5 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">{place.name}</h1>
+          <div className="mt-3 space-y-2 text-sm text-gray-600 sm:text-base">
+            <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary-700" />{place.address}, {place.neighborhood}</p>
+            <p className="flex items-center gap-2"><UtensilsCrossed className="h-5 w-5 shrink-0 text-primary-700" />{categoryNames || "Restaurant"} · Budget {"$".repeat(Math.max(1, place.priceRange))}</p>
+            {place.averageRating !== null && <p className="flex items-center gap-2 font-semibold text-gray-800"><Star className="h-5 w-5 fill-amber-400 text-amber-400" />{place.averageRating.toFixed(1)} <span className="font-normal text-gray-500">({place.reviews.length} avis)</span></p>}
           </div>
         </div>
-
-        {/* Adresse et téléphone */}
-        <div className="mt-4 space-y-2 text-gray-600">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-primary-500" />
-            <span>
-              {place.address}, {place.neighborhood}
-            </span>
-          </div>
-          {place.phone && (
-            <div className="flex items-center gap-2">
-              <Phone className="w-5 h-5 text-primary-500" />
-              <span>{place.phone}</span>
-            </div>
-          )}
-        </div>
+        <FavoriteButton placeId={place.id} initialFavorite={place.isFavorite} size="md" className="shrink-0 border border-gray-200 shadow-sm" />
       </div>
-    </div>
+    </header>
   );
 }

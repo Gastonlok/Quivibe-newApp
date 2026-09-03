@@ -3,37 +3,33 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  passwordHash  String?
-  role          String    @default("USER") // "USER" | "OWNER" | "ADMIN"
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  passwordHash    String?
+  role            String    @default("USER")
+  ownerStatus     String?
+  ownerRequest    String?
+  ownerVerifiedAt DateTime?
+  emailVerified   DateTime?
+  image           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  // ✅ Nouveau champ pour le statut du propriétaire
-  ownerStatus   String?   // "PENDING" | "APPROVED" | "REJECTED" - null par défaut
-  ownerRequest  String?   // Raison ou message du propriétaire
-  ownerVerifiedAt DateTime? // Date de validation
-
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
   accounts      Account[]
   sessions      Session[]
-  places        Place[]   @relation("PlaceOwner")
+  places        Place[]        @relation("PlaceOwner")
   reviews       Review[]
   favorites     Favorite[]
-  events        Event[]   @relation("EventOrganizer")
-
-  // ✅ Ajouter la relation inverse pour OwnerRequest
-  ownerRequests OwnerRequest[] // Un utilisateur peut avoir plusieurs demandes
+  events        Event[]        @relation("EventOrganizer")
+  ownerRequests OwnerRequest[]
+  reservations  Reservation[]  @relation("ReservationCustomer")
 
   @@map("users")
 }
@@ -77,133 +73,194 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// ✅ Nouveau modèle pour les demandes de propriétaires
 model OwnerRequest {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  placeName     String
-  placeAddress  String
-  placePhone    String?
-  description   String?
-  status        String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
-  adminNote     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  reviewedAt    DateTime?
-  reviewedBy    String?   // ID de l'admin qui a traité la demande
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeName    String
+  placeAddress String
+  placePhone   String?
+  description  String?
+  status       String    @default("PENDING")
+  adminNote    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  reviewedAt   DateTime?
+  reviewedBy   String?
 
+  @@index([status, createdAt])
   @@map("owner_requests")
 }
 
-// ============================================
-// MODÈLES DE L'APPLICATION
-// ============================================
-
 model Place {
-  id            String    @id @default(cuid())
-  name          String
-  slug          String    @unique
-  description   String
-  address       String
-  neighborhood  String
-  latitude      Float
-  longitude     Float
-  priceRange    Int
-  phone         String?
-  status        String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                      String   @id @default(cuid())
+  name                    String
+  slug                    String   @unique
+  description             String
+  address                 String
+  neighborhood            String
+  latitude                Float
+  longitude               Float
+  priceRange              Int
+  phone                   String?
+  status                  String   @default("PENDING")
+  reservationsEnabled     Boolean  @default(true)
+  reservationDuration     Int      @default(120)
+  reservationCapacity     Int      @default(40)
+  maxPartySize            Int      @default(12)
+  autoConfirmReservations Boolean  @default(true)
+  reservationStartTime    String   @default("11:00")
+  reservationEndTime      String   @default("23:00")
+  reservationInterval     Int      @default(30)
+  menuVisible             Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  owner         User      @relation("PlaceOwner", fields: [ownerId], references: [id])
-  ownerId       String
-
-  categories    PlaceCategory[]
-  reviews       Review[]
-  favorites     Favorite[]
-  events        Event[]
-  media         Media[]
+  owner        User            @relation("PlaceOwner", fields: [ownerId], references: [id])
+  ownerId      String
+  categories   PlaceCategory[]
+  reviews      Review[]
+  favorites    Favorite[]
+  events       Event[]
+  media        Media[]
+  reservations Reservation[]
+  visits       PlaceVisit[]
+  menuItems    MenuItem[]
 
   @@index([neighborhood])
+  @@index([status, createdAt])
+  @@index([ownerId])
   @@map("places")
 }
 
+model MenuItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       String?
+  category    String?
+  available   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  placeId     String
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@index([placeId, sortOrder])
+  @@map("menu_items")
+}
+
 model Category {
-  id            String    @id @default(cuid())
-  name          String    @unique
-  slug          String    @unique
-  places        PlaceCategory[]
+  id     String          @id @default(cuid())
+  name   String          @unique
+  slug   String          @unique
+  places PlaceCategory[]
 
   @@map("categories")
 }
 
 model PlaceCategory {
-  place         Place     @relation(fields: [placeId], references: [id])
-  placeId       String
-  category      Category  @relation(fields: [categoryId], references: [id])
-  categoryId    String
+  place      Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  placeId    String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
 
   @@id([placeId, categoryId])
   @@map("place_categories")
 }
 
 model Review {
-  id            String    @id @default(cuid())
-  rating        Int
-  comment       String
-  status        String    @default("APPROVED") // "APPROVED" | "PENDING" | "REJECTED"
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String
+  status    String   @default("APPROVED")
+  createdAt DateTime @default(now())
 
-  author        User      @relation(fields: [authorId], references: [id])
-  authorId      String
-  place         Place     @relation(fields: [placeId], references: [id])
-  placeId       String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+  place    Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  placeId  String
 
-  @@index([placeId])
+  @@index([placeId, status, createdAt])
   @@map("reviews")
 }
 
 model Favorite {
-  user          User      @relation(fields: [userId], references: [id])
-  userId        String
-  place         Place     @relation(fields: [placeId], references: [id])
-  placeId       String
-  createdAt     DateTime  @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  placeId   String
+  createdAt DateTime @default(now())
 
   @@id([userId, placeId])
   @@map("favorites")
 }
 
 model Event {
-  id            String    @id @default(cuid())
-  title         String
-  description   String
-  startDate     DateTime
-  endDate       DateTime?
-  status        String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  organizer     User      @relation("EventOrganizer", fields: [organizerId], references: [id])
-  organizerId   String
-  place         Place     @relation(fields: [placeId], references: [id])
-  placeId       String
-  media         Media[]
+  organizer   User    @relation("EventOrganizer", fields: [organizerId], references: [id])
+  organizerId String
+  place       Place   @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  placeId     String
+  media       Media[]
 
   @@index([startDate])
   @@map("events")
 }
 
 model Media {
-  id            String    @id @default(cuid())
-  url           String
-  altText       String?
-  createdAt     DateTime  @default(now())
-  placeId       String?
-  place         Place?    @relation(fields: [placeId], references: [id])
-  eventId       String?
-  event         Event?    @relation(fields: [eventId], references: [id])
+  id        String   @id @default(cuid())
+  url       String
+  altText   String?
+  createdAt DateTime @default(now())
+  placeId   String?
+  place     Place?   @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  eventId   String?
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("media")
 }
 
+model Reservation {
+  id             String    @id @default(cuid())
+  reference      String    @unique
+  dateTime       DateTime
+  partySize      Int
+  status         String    @default("PENDING")
+  phone          String?
+  specialRequest String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  cancelledAt    DateTime?
+
+  customer   User   @relation("ReservationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  place      Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  placeId    String
+
+  @@index([customerId, dateTime])
+  @@index([placeId, dateTime, status])
+  @@map("reservations")
+}
+
+model PlaceVisit {
+  id         String   @id @default(cuid())
+  visitorKey String
+  visitedAt  DateTime @default(now())
+  placeId    String
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@index([placeId, visitedAt])
+  @@index([visitorKey, visitedAt])
+  @@map("place_visits")
+}

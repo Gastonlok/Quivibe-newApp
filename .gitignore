@@ -37,4 +37,7 @@ apps/web/prisma/*.db
 
 # Misc
 *.tsbuildinfo
-.vercel/
+
+.vercel
+.env*
+.neon

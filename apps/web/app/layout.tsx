@@ -1,20 +1,19 @@
-// apps/web/app/layout.tsx
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "@/styles/globals.css";
 import "@/styles/theme.css";
+import "leaflet/dist/leaflet.css";
 import { Navbar } from "@/components/navbar";
+import { PageNavigation } from "@/components/page-navigation";
 import { Footer } from "@/components/footer";
 import { SessionProvider } from "next-auth/react";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
 export const metadata: Metadata = {
-  title: "Quivibe - Découvrez où sortir à Kinshasa",
-  description: "Restaurants, bars, lounges et événements près de chez vous",
+  title: "Quivibe — Réservez les meilleures tables de Kinshasa",
+  description:
+    "Découvrez, comparez et réservez restaurants, bars, lounges et expériences à Kinshasa.",
+  icons: {
+    icon: "/brand/quivibe-logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -23,13 +22,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={inter.variable}>
-      <body className="min-h-screen bg-gray-50 flex flex-col">
+    <html lang="fr">
+      <body className="flex min-h-screen flex-col bg-gray-50 text-gray-950">
         <SessionProvider>
           <Navbar />
-          <main className="flex-1">
-            {children}
-          </main>
+          <PageNavigation />
+          <div className="flex-1">{children}</div>
           <Footer />
         </SessionProvider>
       </body>

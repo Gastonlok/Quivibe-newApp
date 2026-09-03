@@ -1,7 +1,7 @@
 // apps/web/app/register/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
@@ -12,11 +12,18 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginHref, setLoginHref] = useState("/login");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
   });
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("callbackUrl");
+    const callbackUrl = raw?.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+    setLoginHref(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,10 +48,13 @@ export default function RegisterPage() {
 
       setSuccess(true);
 
-      // ✅ Rediriger vers login après 2s
+      const raw = new URLSearchParams(window.location.search).get("callbackUrl");
+      const callbackUrl = raw?.startsWith("/") && !raw.startsWith("//") ? raw : "/";
       setTimeout(() => {
-        router.push("/login?registered=true");
-      }, 2000);
+        router.push(
+          `/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+        );
+      }, 3500);
 
     } catch (error) {
       setError("Une erreur est survenue");
@@ -74,7 +84,7 @@ export default function RegisterPage() {
               <input
                 type="text"
                 required
-                placeholder="Votre nom"
+                placeholder="Grâce Mbala"
                 className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -91,7 +101,7 @@ export default function RegisterPage() {
               <input
                 type="email"
                 required
-                placeholder="vous@email.com"
+                placeholder="grace.mbala@exemple.cd"
                 className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -128,7 +138,7 @@ export default function RegisterPage() {
           {success && (
             <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-              Compte créé avec succès ! Redirection vers la connexion...
+              Un e-mail de confirmation a été envoyé dans votre boîte mail. Veuillez confirmer votre adresse e-mail avant de vous connecter.
             </div>
           )}
 
@@ -150,7 +160,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-gray-600">
           Déjà un compte ?{" "}
-          <Link href="/login" className="text-primary-500 hover:text-primary-600 font-medium">
+          <Link href={loginHref} className="text-primary-500 hover:text-primary-600 font-medium">
             Se connecter
           </Link>
         </p>

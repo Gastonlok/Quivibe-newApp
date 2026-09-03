@@ -1,20 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import L from "leaflet";
-
-// ✅ Import du CSS avec une syntaxe simple
-// Note: Si l'erreur persiste, utilisez cette ligne avec un commentaire TypeScript
-// @ts-ignore
-import "leaflet/dist/leaflet.css";
-
-// Configuration des icônes Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
+import type L from "leaflet";
 
 interface PlaceMapProps {
   latitude: number;
@@ -26,22 +13,37 @@ export function PlaceMap({ latitude, longitude, name }: PlaceMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    let disposed = false;
+    let map: L.Map | undefined;
 
-    const map = L.map(mapRef.current).setView([latitude, longitude], 15);
+    async function createMap() {
+      const { default: leaflet } = await import("leaflet");
+      if (disposed || !mapRef.current) return;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(map);
+      delete (leaflet.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: () => string })._getIconUrl;
+      leaflet.Icon.Default.mergeOptions({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
 
-    L.marker([latitude, longitude])
-      .addTo(map)
-      .bindPopup(name);
+      map = leaflet.map(mapRef.current).setView([latitude, longitude], 15);
+      leaflet
+        .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "OpenStreetMap contributors",
+        })
+        .addTo(map);
+
+      leaflet.marker([latitude, longitude]).addTo(map).bindPopup(name);
+    }
+
+    void createMap();
 
     return () => {
-      map.remove();
+      disposed = true;
+      map?.remove();
     };
   }, [latitude, longitude, name]);
 
-  return <div ref={mapRef} className="w-full h-full" />;
+  return <div ref={mapRef} className="h-full w-full" />;
 }

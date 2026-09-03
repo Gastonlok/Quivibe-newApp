@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
+import { slugify } from "@/utils/slugify";
 
 // ============================================
 // TYPES
@@ -20,6 +21,11 @@ export interface PlaceWithFavorites {
   priceRange: number;
   phone: string | null;
   status: string;
+  reservationsEnabled: boolean;
+  reservationDuration: number;
+  reservationCapacity: number;
+  maxPartySize: number;
+  autoConfirmReservations: boolean;
   createdAt: Date;
   updatedAt: Date;
   ownerId: string;
@@ -274,7 +280,11 @@ export async function getPlaceBySlug(slug: string) {
             category: true,
           },
         },
-        media: true,
+        media: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
         reviews: {
           where: {
             status: "APPROVED",
@@ -302,6 +312,10 @@ export async function getPlaceBySlug(slug: string) {
           },
           take: 5,
         },
+        menuItems: {
+          where: { available: true },
+          orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+        },
         favorites: userId
           ? {
               where: {
@@ -323,8 +337,11 @@ export async function getPlaceBySlug(slug: string) {
       ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
       : null;
 
+    const { menuItems, ...placeData } = place;
+
     return {
-      ...place,
+      ...placeData,
+      menuItems: place.menuVisible ? menuItems : [],
       averageRating,
       isFavorite: place.favorites && place.favorites.length > 0,
     };
@@ -396,23 +413,56 @@ export async function getPlaceEvents(placeId: string) {
 export async function createPlaceAction(data: any) {
   try {
     const session = await auth();
-    if (!session || session.user?.role !== "ADMIN") {
+    if (!session?.user || !["ADMIN", "OWNER"].includes(session.user.role)) {
       return { success: false, error: "Non autorisé" };
     }
 
+    const name = String(data.name || "").trim();
+    const address = String(data.address || "").trim();
+    const neighborhood = String(data.neighborhood || "").trim();
+    if (name.length < 2 || !address || !neighborhood) {
+      return {
+        success: false,
+        error: "Le nom, l'adresse et le quartier sont obligatoires.",
+      };
+    }
+
+    const baseSlug = slugify(String(data.slug || name)) || `etablissement-${Date.now()}`;
+    const existingSlug = await prisma.place.findUnique({
+      where: { slug: baseSlug },
+      select: { id: true },
+    });
+    const slug = existingSlug
+      ? `${baseSlug}-${Date.now().toString(36).slice(-5)}`
+      : baseSlug;
+
     const place = await prisma.place.create({
       data: {
-        name: data.name,
-        slug: data.slug || data.name.toLowerCase().replace(/ /g, "-"),
-        description: data.description || "",
-        address: data.address,
-        neighborhood: data.neighborhood,
-        latitude: data.latitude || 0,
-        longitude: data.longitude || 0,
-        priceRange: data.priceRange || 2,
-        phone: data.phone || null,
-        ownerId: data.ownerId || session.user.id,
-        status: "APPROVED",
+        name,
+        slug,
+        description: String(data.description || "").trim(),
+        address,
+        neighborhood,
+        latitude: Number.isFinite(Number(data.latitude))
+          ? Number(data.latitude)
+          : -4.325,
+        longitude: Number.isFinite(Number(data.longitude))
+          ? Number(data.longitude)
+          : 15.322,
+        priceRange: Math.min(4, Math.max(1, Number(data.priceRange) || 2)),
+        phone: String(data.phone || "").trim() || null,
+        ownerId:
+          session.user.role === "ADMIN" && data.ownerId
+            ? String(data.ownerId)
+            : session.user.id,
+        status: session.user.role === "ADMIN" ? "APPROVED" : "PENDING",
+        categories: data.categoryId
+          ? {
+              create: {
+                category: { connect: { id: String(data.categoryId) } },
+              },
+            }
+          : undefined,
       },
     });
 

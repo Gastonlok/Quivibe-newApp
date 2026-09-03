@@ -1,396 +1,351 @@
-"use client";
-
-import { useState } from "react";
-import {
-  Store,
-  Calendar,
-  Users,
-  Star,
-  TrendingUp,
-  Clock,
-  Settings,
-  LogOut,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  BarChart3,
-  MessageSquare,
-  Bell,
-  Search,
-  Filter,
-  Utensils
-} from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
-import { motion } from "framer-motion";
+import { redirect } from "next/navigation";
+import {
+  BarChart3,
+  CalendarCheck2,
+  Eye,
+  Heart,
+  MapPin,
+  MessageSquare,
+  Plus,
+  Star,
+  Store,
+  Settings2,
+  Users,
+} from "lucide-react";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-// ✅ Définir les types pour les couleurs
-type StatColorKey = "primary" | "green" | "yellow" | "blue" | "purple";
+export const dynamic = "force-dynamic";
 
-export default function OwnerDashboard() {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [dateRange, setDateRange] = useState("7d");
+export default async function OwnerDashboard() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login?callbackUrl=/owner/dashboard");
+  if (!["OWNER", "ADMIN"].includes(session.user.role)) redirect("/");
 
-  const stats = {
-    views: 1247,
-    reservations: 48,
-    rating: 4.8,
-    reviews: 89,
-    conversion: 12.5
-  };
+  const ownerFilter =
+    session.user.role === "ADMIN" ? {} : { ownerId: session.user.id };
 
-  const recentReviews = [
-    { id: 1, user: "Marie K.", rating: 5, comment: "Excellent restaurant ! Je reviendrai", date: "Il y a 2h" },
-    { id: 2, user: "Jean P.", rating: 4, comment: "Très bonne cuisine, service impeccable", date: "Il y a 5h" },
-    { id: 3, user: "Sophie M.", rating: 5, comment: "Une découverte exceptionnelle !", date: "Il y a 1j" }
-  ];
+  const [places, upcomingReservations, recentReviews] = await Promise.all([
+    prisma.place.findMany({
+      where: ownerFilter,
+      include: {
+        reviews: {
+          where: { status: "APPROVED" },
+          select: { rating: true },
+        },
+        _count: {
+          select: {
+            reservations: true,
+            favorites: true,
+            events: true,
+            visits: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.reservation.findMany({
+      where: {
+        dateTime: { gte: new Date() },
+        status: { in: ["PENDING", "CONFIRMED"] },
+        ...(session.user.role === "ADMIN"
+          ? {}
+          : { place: { ownerId: session.user.id } }),
+      },
+      include: {
+        customer: { select: { name: true, email: true } },
+        place: { select: { name: true } },
+      },
+      orderBy: { dateTime: "asc" },
+      take: 6,
+    }),
+    prisma.review.findMany({
+      where: {
+        status: "APPROVED",
+        ...(session.user.role === "ADMIN"
+          ? {}
+          : { place: { ownerId: session.user.id } }),
+      },
+      include: {
+        author: { select: { name: true } },
+        place: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+  ]);
 
-  const upcomingReservations = [
-    { id: 1, name: "Dupont", time: "20:00", guests: 4, phone: "+243 812345678" },
-    { id: 2, name: "Mbemba", time: "21:30", guests: 2, phone: "+243 987654321" },
-    { id: 3, name: "Kanda", time: "19:30", guests: 6, phone: "+243 765432198" }
-  ];
-
-  const topDishes = [
-    { name: "Poulet Braisé", orders: 45, revenue: 450000 },
-    { name: "Poisson Fumé", orders: 38, revenue: 380000 },
-    { name: "Fufu Pondu", orders: 32, revenue: 320000 }
-  ];
+  const ratings = places.flatMap((place) => place.reviews.map((review) => review.rating));
+  const averageRating =
+    ratings.length > 0
+      ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+      : null;
+  const totalReservations = places.reduce(
+    (sum, place) => sum + place._count.reservations,
+    0,
+  );
+  const totalFavorites = places.reduce(
+    (sum, place) => sum + place._count.favorites,
+    0,
+  );
+  const totalVisits = places.reduce((sum, place) => sum + place._count.visits, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardNav />
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          <DashboardSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
-          <div className="flex-1">
-            {activeTab === "overview" && (
-              <>
-                <div className="mb-8">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
-                      <p className="text-gray-500">Bienvenue dans votre espace propriétaire</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button className="px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-full hover:bg-primary-600 transition-colors flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        Nouvel événement
-                      </button>
-                      <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-full hover:bg-gray-50 transition-colors border border-gray-200">
-                        <Calendar className="w-4 h-4 inline mr-1" />
-                        {dateRange === "7d" ? "7 jours" : "30 jours"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-                  <StatCard
-                    icon={Eye}
-                    label="Vues"
-                    value={stats.views}
-                    change="+12%"
-                    color="primary"
-                  />
-                  <StatCard
-                    icon={Calendar}
-                    label="Réservations"
-                    value={stats.reservations}
-                    change="+8%"
-                    color="green"
-                  />
-                  <StatCard
-                    icon={Star}
-                    label="Note moyenne"
-                    value={stats.rating}
-                    change="+0.2"
-                    color="yellow"
-                  />
-                  <StatCard
-                    icon={MessageSquare}
-                    label="Avis"
-                    value={stats.reviews}
-                    change="+15%"
-                    color="blue"
-                  />
-                  <StatCard
-                    icon={TrendingUp}
-                    label="Conversion"
-                    value={stats.conversion + "%"}
-                    change="+2.5%"
-                    color="purple"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900">Activité récente</h3>
-                      <select className="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
-                        <option>Cette semaine</option>
-                        <option>Ce mois</option>
-                        <option>Cette année</option>
-                      </select>
-                    </div>
-                    <div className="h-64 flex items-end gap-2">
-                      {[45, 62, 38, 51, 42, 58, 70].map((value, i) => (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                          <motion.div
-                            initial={{ height: 0 }}
-                            animate={{ height: `${value * 2}px` }}
-                            transition={{ duration: 0.5, delay: i * 0.1 }}
-                            className="w-full bg-gradient-to-t from-primary-400 to-primary-500 rounded-lg relative group cursor-pointer"
-                          >
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                              {value} réservations
-                            </div>
-                          </motion.div>
-                          <span className="text-xs text-gray-400">J{i+1}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <h3 className="font-semibold text-gray-900 mb-4">Plats populaires</h3>
-                    <div className="space-y-4">
-                      {topDishes.map((dish, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-gray-800">{dish.name}</p>
-                            <p className="text-sm text-gray-500">{dish.orders} commandes</p>
-                          </div>
-                          <span className="text-sm font-semibold text-primary-600">
-                            {dish.revenue.toLocaleString()} FC
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900">Réservations à venir</h3>
-                      <Link href="/owner/reservations" className="text-sm text-primary-500 hover:text-primary-600">
-                        Voir tout
-                      </Link>
-                    </div>
-                    <div className="space-y-3">
-                      {upcomingReservations.map((res) => (
-                        <div key={res.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                          <div>
-                            <p className="font-medium text-gray-800">{res.name}</p>
-                            <p className="text-sm text-gray-500">{res.guests} personnes • {res.phone}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-sm font-medium text-primary-600">{res.time}</span>
-                            <button className="block text-xs text-gray-400 hover:text-gray-600">Confirmer</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-gray-900">Derniers avis</h3>
-                      <Link href="/owner/reviews" className="text-sm text-primary-500 hover:text-primary-600">
-                        Voir tout
-                      </Link>
-                    </div>
-                    <div className="space-y-3">
-                      {recentReviews.map((review) => (
-                        <div key={review.id} className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-gray-800">{review.user}</p>
-                              <div className="flex items-center gap-1 mt-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                                ))}
-                              </div>
-                            </div>
-                            <span className="text-xs text-gray-400">{review.date}</span>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">{review.comment}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === "menu" && <MenuManagement />}
-            {activeTab === "events" && <EventsManagement />}
-            {activeTab === "reservations" && <ReservationsManagement />}
-            {activeTab === "reviews" && <ReviewsManagement />}
-            {activeTab === "settings" && <SettingsManagement />}
+    <main className="min-h-screen bg-gray-50">
+      <div className="container py-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-[0.18em] text-primary-700">
+              Espace professionnel
+            </p>
+            <h1 className="mt-2 text-4xl font-extrabold tracking-tight text-gray-950">
+              Tableau de bord
+            </h1>
+            <p className="mt-2 text-gray-600">
+              Bienvenue {session.user.name}. Suivez vos établissements et vos réservations.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/owner/analytics"
+              className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-5 py-3 text-sm font-extrabold text-primary-800 hover:border-primary-600"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Statistiques
+            </Link>
+            <Link
+              href="/owner/reservations"
+              className="rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-extrabold text-gray-800 hover:border-primary-600 hover:text-primary-700"
+            >
+              Gérer les réservations
+            </Link>
+            <Link
+              href="/places/new"
+              className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-5 py-3 text-sm font-extrabold text-white hover:bg-primary-700"
+            >
+              <Plus className="h-4 w-4" />
+              Ajouter un établissement
+            </Link>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function DashboardNav() {
-  return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/owner/dashboard" className="flex items-center gap-2">
-            <Store className="w-6 h-6 text-primary-500" />
-            <span className="font-bold text-lg">Mon Restaurant</span>
-          </Link>
+        <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard icon={Store} label="Établissements" value={places.length} />
+          <StatCard icon={CalendarCheck2} label="Réservations" value={totalReservations} />
+          <StatCard
+            icon={Star}
+            label="Note moyenne"
+            value={averageRating === null ? "—" : averageRating.toFixed(1)}
+          />
+          <StatCard icon={Heart} label="Ajouts aux favoris" value={totalFavorites} />
+          <StatCard icon={Eye} label="Visites de fiche" value={totalVisits} />
+        </section>
 
-          <div className="flex items-center gap-4">
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-primary-600 font-semibold text-sm">P</span>
-              </div>
-              <span className="text-sm font-medium text-gray-700 hidden md:block">Patrick</span>
+        {places.length === 0 ? (
+          <section className="mt-8 rounded-3xl border border-gray-200 bg-white p-10 text-center shadow-soft">
+            <Store className="mx-auto h-10 w-10 text-primary-600" />
+            <h2 className="mt-4 text-xl font-extrabold text-gray-950">
+              Aucun établissement rattaché
+            </h2>
+            <p className="mt-2 text-gray-600">
+              Ajoutez votre première fiche ; elle sera publiée après validation administrative.
+            </p>
+            <Link
+              href="/places/new"
+              className="mt-6 inline-flex rounded-full bg-primary-600 px-6 py-3 text-sm font-extrabold text-white hover:bg-primary-700"
+            >
+              Créer ma fiche
+            </Link>
+          </section>
+        ) : (
+          <section className="mt-8 grid gap-4 lg:grid-cols-2">
+            {places.map((place) => {
+              const placeRating =
+                place.reviews.length > 0
+                  ? place.reviews.reduce((sum, review) => sum + review.rating, 0) /
+                    place.reviews.length
+                  : null;
+              return (
+                <article
+                  key={place.id}
+                  className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-xl font-extrabold text-gray-950">
+                          {place.name}
+                        </h2>
+                        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${
+                          place.status === "APPROVED"
+                            ? "bg-primary-50 text-primary-700"
+                            : place.status === "REJECTED"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-amber-50 text-amber-800"
+                        }`}>
+                          {place.status === "APPROVED"
+                            ? "Publié"
+                            : place.status === "REJECTED"
+                              ? "Refusé"
+                              : "En validation"}
+                        </span>
+                      </div>
+                      <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-gray-600">
+                        <MapPin className="h-4 w-4 text-primary-600" />
+                        {place.neighborhood}
+                      </p>
+                    </div>
+                    {place.status === "APPROVED" && (
+                      <Link
+                        href={`/places/${place.slug}`}
+                        className="text-sm font-extrabold text-primary-700 hover:underline"
+                      >
+                        Voir la fiche
+                      </Link>
+                    )}
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+                    <MiniStat label="Réservations" value={place._count.reservations} />
+                    <MiniStat label="Favoris" value={place._count.favorites} />
+                    <MiniStat label="Événements" value={place._count.events} />
+                    <MiniStat
+                      label="Note"
+                      value={placeRating === null ? "—" : placeRating.toFixed(1)}
+                    />
+                    <MiniStat label="Visites" value={place._count.visits} />
+                  </div>
+
+                  <p className="mt-5 text-sm font-semibold text-gray-600">
+                    Réservation en ligne : {place.reservationsEnabled ? "activée" : "désactivée"}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <Link
+                      href={`/owner/places/${place.id}/edit`}
+                      className="inline-flex items-center gap-2 rounded-full bg-gray-950 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-gray-800"
+                    >
+                      <Settings2 className="h-4 w-4" /> Gérer la fiche
+                    </Link>
+                    <Link
+                      href="/owner/analytics"
+                      className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2.5 text-sm font-extrabold text-gray-700 transition hover:border-primary-600 hover:text-primary-700"
+                    >
+                      <BarChart3 className="h-4 w-4" /> Statistiques
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        )}
+
+        <section className="mt-8 grid gap-6 xl:grid-cols-2">
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-xl font-extrabold text-gray-950">
+                Prochaines réservations
+              </h2>
+              <Link
+                href="/owner/reservations"
+                className="text-sm font-extrabold text-primary-700 hover:underline"
+              >
+                Voir tout
+              </Link>
+            </div>
+            <div className="mt-5 space-y-3">
+              {upcomingReservations.length === 0 ? (
+                <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
+                  Aucune réservation à venir.
+                </p>
+              ) : (
+                upcomingReservations.map((reservation) => (
+                  <div
+                    key={reservation.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4"
+                  >
+                    <div>
+                      <p className="font-extrabold text-gray-900">
+                        {reservation.customer.name}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {reservation.place.name} · {reservation.partySize} personne{reservation.partySize > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="text-right text-sm font-bold text-primary-700">
+                      {new Intl.DateTimeFormat("fr-FR", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Africa/Kinshasa",
+                      }).format(reservation.dateTime)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
-        </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-5 w-5 text-primary-600" />
+              <h2 className="text-xl font-extrabold text-gray-950">Derniers avis</h2>
+            </div>
+            <div className="mt-5 space-y-3">
+              {recentReviews.length === 0 ? (
+                <p className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
+                  Aucun avis publié pour le moment.
+                </p>
+              ) : (
+                recentReviews.map((review) => (
+                  <article key={review.id} className="rounded-2xl bg-gray-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-extrabold text-gray-900">
+                        {review.author.name} · {review.place.name}
+                      </p>
+                      <span className="flex items-center gap-1 text-sm font-extrabold text-gray-800">
+                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                        {review.rating}/5
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                      {review.comment}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
       </div>
-    </nav>
+    </main>
   );
 }
 
-function DashboardSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
-  const tabs = [
-    { id: "overview", label: "Vue d'ensemble", icon: BarChart3 },
-    { id: "menu", label: "Gestion du menu", icon: Utensils },
-    { id: "events", label: "Événements", icon: Calendar },
-    { id: "reservations", label: "Réservations", icon: Users },
-    { id: "reviews", label: "Avis", icon: Star },
-    { id: "settings", label: "Paramètres", icon: Settings },
-  ];
-
-  return (
-    <div className="lg:w-64 flex-shrink-0">
-      <div className="bg-white rounded-xl shadow-sm p-4 sticky top-24 border border-gray-100">
-        <div className="space-y-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                  isActive
-                    ? "bg-primary-50 text-primary-600"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="border-t border-gray-200 mt-4 pt-4">
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-            <LogOut className="w-4 h-4" />
-            Déconnexion
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ✅ Composant StatCard avec typage correct
 function StatCard({
   icon: Icon,
   label,
   value,
-  change,
-  color
 }: {
   icon: React.ElementType;
   label: string;
   value: string | number;
-  change: string;
-  color: StatColorKey;
 }) {
-  const colors: Record<StatColorKey, string> = {
-    primary: "bg-primary-50 text-primary-600",
-    green: "bg-green-50 text-green-600",
-    yellow: "bg-yellow-50 text-yellow-600",
-    blue: "bg-blue-50 text-blue-600",
-    purple: "bg-purple-50 text-purple-600",
-  };
-
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className={`p-2 rounded-lg ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-          {change}
-        </span>
+    <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-soft">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+        <Icon className="h-5 w-5" />
       </div>
-      <p className="text-2xl font-bold text-gray-900 mt-3">{value}</p>
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="mt-5 text-3xl font-extrabold tracking-tight text-gray-950">{value}</p>
+      <p className="mt-1 text-sm font-bold text-gray-500">{label}</p>
     </div>
   );
 }
 
-// Pages de gestion
-function MenuManagement() {
+function MiniStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <h2 className="text-xl font-bold mb-4">Gestion du menu</h2>
-      <p className="text-gray-500">Ajoutez, modifiez ou supprimez vos plats ici.</p>
-    </div>
-  );
-}
-
-function EventsManagement() {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <h2 className="text-xl font-bold mb-4">Événements</h2>
-      <p className="text-gray-500">Créez et gérez vos événements spéciaux.</p>
-    </div>
-  );
-}
-
-function ReservationsManagement() {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <h2 className="text-xl font-bold mb-4">Réservations</h2>
-      <p className="text-gray-500">Consultez et gérez toutes vos réservations.</p>
-    </div>
-  );
-}
-
-function ReviewsManagement() {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <h2 className="text-xl font-bold mb-4">Avis</h2>
-      <p className="text-gray-500">Consultez et répondez aux avis de vos clients.</p>
-    </div>
-  );
-}
-
-function SettingsManagement() {
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-      <h2 className="text-xl font-bold mb-4">Paramètres</h2>
-      <p className="text-gray-500">Gérez les informations de votre établissement.</p>
+    <div className="rounded-2xl bg-gray-50 p-3 text-center">
+      <p className="text-lg font-extrabold text-gray-950">{value}</p>
+      <p className="mt-1 text-xs font-bold text-gray-500">{label}</p>
     </div>
   );
 }
