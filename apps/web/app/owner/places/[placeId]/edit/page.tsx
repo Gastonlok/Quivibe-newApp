@@ -5,6 +5,7 @@ import { OwnerPlaceEditor } from "@/features/owner/components/owner-place-editor
 import { OwnerPlaceMenuEditor } from "@/features/owner/components/owner-place-menu-editor";
 import { OwnerCollaborationPanel } from "@/features/owner/components/owner-collaboration-panel";
 import { OwnerEngagementPanel } from "@/features/owner/components/owner-engagement-panel";
+import { OwnerPlaceWorkspace } from "@/features/owner/components/owner-place-workspace";
 import { canManageCollaborators, getPlaceAccess } from "@/features/owner/access";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -63,26 +64,24 @@ export default async function OwnerPlaceEditPage({
           </div>
         </div>
 
-        <div className="mt-8">
-          <OwnerPlaceEditor place={place} categories={categories} />
-        </div>
-        <div className="mt-6">
-          <OwnerPlaceMenuEditor
-            placeId={place.id}
-            initialMenuVisible={place.menuVisible}
-            initialItems={place.menuItems}
-          />
-        </div>
-        <div className="mt-6">
-          <OwnerEngagementPanel placeId={place.id} reviews={place.reviews} events={place.events} />
-        </div>
-        <div className="mt-6">
-          <OwnerCollaborationPanel
-            placeId={place.id}
-            collaborators={place.collaborators}
-            canManage={canManageCollaborators(access)}
-          />
-        </div>
+        <OwnerPlaceWorkspace
+          profile={<OwnerPlaceEditor place={place} categories={categories} />}
+          menu={
+            <OwnerPlaceMenuEditor
+              placeId={place.id}
+              initialMenuVisible={place.menuVisible}
+              initialItems={place.menuItems}
+            />
+          }
+          activity={<OwnerEngagementPanel placeId={place.id} reviews={place.reviews} events={place.events} />}
+          team={
+            <OwnerCollaborationPanel
+              placeId={place.id}
+              collaborators={place.collaborators}
+              canManage={canManageCollaborators(access)}
+            />
+          }
+        />
       </div>
     </main>
   );

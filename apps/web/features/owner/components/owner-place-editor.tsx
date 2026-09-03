@@ -274,18 +274,18 @@ export function OwnerPlaceEditor({
           </fieldset>
         </section>
 
-        <section className="overflow-hidden rounded-3xl border border-primary-100 bg-white shadow-soft">
-          <div className="bg-gradient-to-r from-primary-800 to-primary-600 px-6 py-5 text-white">
+        <details className="overflow-hidden rounded-3xl border border-primary-100 bg-white shadow-soft">
+          <summary className="cursor-pointer list-none bg-gradient-to-r from-primary-800 to-primary-600 px-6 py-5 text-white [&::-webkit-details-marker]:hidden">
             <div className="flex items-center gap-3">
               <CalendarClock className="h-6 w-6" />
               <div>
                 <h2 className="text-xl font-extrabold">Reservations en ligne</h2>
                 <p className="mt-1 text-sm text-primary-50">
-                  Definissez exactement les horaires et les capacites proposes aux clients.
+                  Ouvrez pour modifier les horaires et les capacites proposes aux clients.
                 </p>
               </div>
             </div>
-          </div>
+          </summary>
           <div className="p-6">
             <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl bg-primary-50 p-4">
               <div>
@@ -381,7 +381,7 @@ export function OwnerPlaceEditor({
               Confirmer automatiquement les reservations qui respectent la capacite
             </label>
           </div>
-        </section>
+        </details>
 
         <button
           type="submit"
