@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toggleFavorite, isFavorite } from "../actions";
 import { motion } from "framer-motion";
+import { trackPlaceInteraction } from "@/features/owner/components/place-interaction-tracker";
 
 interface FavoriteButtonProps {
   placeId: string;
@@ -65,6 +66,7 @@ export function FavoriteButton({
 
     if (result.success) {
       setIsFavorited(result.action === "added");
+      if (result.action === "added") trackPlaceInteraction(placeId, "FAVORITE");
       router.refresh();
     }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Navigation } from "lucide-react";
+import { trackPlaceInteraction } from "@/features/owner/components/place-interaction-tracker";
 
 function directionsUrl(latitude: number, longitude: number, origin?: GeolocationCoordinates) {
   const parameters = new URLSearchParams({
@@ -18,15 +19,18 @@ export function DirectionsButton({
   latitude,
   longitude,
   placeName,
+  placeId,
 }: {
   latitude: number;
   longitude: number;
   placeName: string;
+  placeId: string;
 }) {
   const [isLocating, setIsLocating] = useState(false);
   const [message, setMessage] = useState("");
 
   function openDirections() {
+    trackPlaceInteraction(placeId, "DIRECTIONS");
     const mapsWindow = window.open("about:blank", "_blank");
     if (mapsWindow) mapsWindow.opener = null;
 

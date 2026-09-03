@@ -38,6 +38,19 @@ model User {
   @@map("users")
 }
 
+model PlaceInteraction {
+  id         String   @id @default(cuid())
+  type       String
+  visitorKey String
+  createdAt  DateTime @default(now())
+  placeId    String
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@index([placeId, type, createdAt])
+  @@map("place_interactions")
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -132,6 +145,7 @@ model Place {
   menuItems    MenuItem[]
   collaborators PlaceCollaborator[]
   waitlistEntries ReservationWaitlist[]
+  interactions PlaceInteraction[]
 
   @@index([neighborhood])
   @@index([status, createdAt])

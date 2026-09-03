@@ -8,6 +8,7 @@ import {
   getAvailableSlotsAction,
   joinReservationWaitlistAction,
 } from "../actions";
+import { trackPlaceInteraction } from "@/features/owner/components/place-interaction-tracker";
 
 interface ReservationWidgetProps {
   placeId: string;
@@ -70,6 +71,7 @@ export function ReservationWidget({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    trackPlaceInteraction(placeId, "RESERVATION_START");
     if (!time) {
       setError("Sélectionnez une heure disponible.");
       return;

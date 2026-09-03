@@ -92,6 +92,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
                   latitude={place.latitude}
                   longitude={place.longitude}
                   placeName={place.name}
+                  placeId={place.id}
                 />
               </section>
             </div>

@@ -48,7 +48,7 @@ export default async function OwnerAnalyticsPage() {
   periodStart.setDate(periodStart.getDate() - 29);
   periodStart.setHours(0, 0, 0, 0);
 
-  const [places, visits, reservations] = await Promise.all([
+  const [places, visits, reservations, interactions] = await Promise.all([
     prisma.place.findMany({
       where: ownerFilter,
       select: { id: true, name: true },
@@ -62,6 +62,10 @@ export default async function OwnerAnalyticsPage() {
       where: { createdAt: { gte: periodStart }, ...relationFilter },
       select: { placeId: true, partySize: true, status: true },
     }),
+    prisma.placeInteraction.findMany({
+      where: { createdAt: { gte: periodStart }, ...relationFilter },
+      select: { placeId: true, type: true },
+    }),
   ]);
 
   const uniqueVisitors = new Set(visits.map((visit) => visit.visitorKey)).size;
@@ -70,6 +74,9 @@ export default async function OwnerAnalyticsPage() {
     ["CONFIRMED", "COMPLETED"].includes(reservation.status),
   ).length;
   const conversionRate = uniqueVisitors ? (reservations.length / uniqueVisitors) * 100 : 0;
+  const directions = interactions.filter((interaction) => interaction.type === "DIRECTIONS").length;
+  const favorites = interactions.filter((interaction) => interaction.type === "FAVORITE").length;
+  const reservationStarts = interactions.filter((interaction) => interaction.type === "RESERVATION_START").length;
 
   const visitCountByPlace = new Map<string, number>();
   const reservationCountByPlace = new Map<string, number>();
@@ -136,6 +143,7 @@ export default async function OwnerAnalyticsPage() {
             value={`${conversionRate.toFixed(1)}%`}
             detail={`${totalGuests} couverts reserves`}
           />
+          <MetricCard icon={MousePointerClick} label="Actions d'intention" value={interactions.length} detail={`${reservationStarts} reservations, ${directions} itineraires, ${favorites} favoris`} />
         </section>
 
         <section className="mt-8 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
