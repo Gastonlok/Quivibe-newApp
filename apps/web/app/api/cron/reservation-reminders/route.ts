@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Non autorise." }, { status: 401 });
   }
 
-  const now = new Date();
-  const tomorrow = new Date(now.getTime() + 23 * 60 * 60_000);
-  const afterTomorrow = new Date(now.getTime() + 25 * 60 * 60_000);
+  const tomorrowDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kinshasa" })
+    .format(new Date(Date.now() + 24 * 60 * 60_000));
+  const tomorrow = new Date(`${tomorrowDate}T00:00:00+01:00`);
+  const afterTomorrow = new Date(tomorrow.getTime() + 24 * 60 * 60_000);
   const reservations = await prisma.reservation.findMany({
     where: { status: "CONFIRMED", reminderSentAt: null, dateTime: { gte: tomorrow, lt: afterTomorrow } },
     include: { customer: { select: { name: true, email: true } }, place: { select: { name: true } } },
