@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +13,10 @@ import {
 } from "./schema";
 
 const ACTIVE_STATUSES = ["PENDING", "CONFIRMED"] as const;
+
+class ReservationCapacityError extends Error {}
+
+type ReservationReader = Pick<Prisma.TransactionClient, "reservation">;
 
 function toKinshasaDate(date: string, time: string) {
   return new Date(`${date}T${time}:00+01:00`);
@@ -55,6 +60,7 @@ function formatReference(date: string) {
 }
 
 async function occupiedSeats(
+  db: ReservationReader,
   placeId: string,
   dateTime: Date,
   durationMinutes: number,
@@ -62,7 +68,7 @@ async function occupiedSeats(
   const windowStart = new Date(dateTime.getTime() - durationMinutes * 60_000);
   const windowEnd = new Date(dateTime.getTime() + durationMinutes * 60_000);
 
-  const reservations = await prisma.reservation.findMany({
+  const reservations = await db.reservation.findMany({
     where: {
       placeId,
       status: { in: [...ACTIVE_STATUSES] },
@@ -112,6 +118,7 @@ export async function getAvailableSlotsAction(raw: {
     if (dateTime.getTime() < Date.now() + 60 * 60_000) continue;
 
     const occupied = await occupiedSeats(
+      prisma,
       input.placeId,
       dateTime,
       place.reservationDuration,
@@ -168,25 +175,45 @@ export async function createReservationAction(raw: CreateReservationInput) {
     return { success: false as const, code: "INVALID_SLOT", error: "Ce creneau n'est plus propose par l'etablissement." };
   }
 
-  const occupied = await occupiedSeats(place.id, dateTime, place.reservationDuration);
-  if (occupied + input.partySize > place.reservationCapacity) {
-    return { success: false as const, code: "NO_CAPACITY", error: "Ce créneau vient d’être complet. Choisissez une autre heure." };
+  const status = place.autoConfirmReservations ? "CONFIRMED" : "PENDING";
+  let reservation: { reference: string; status: string } | undefined;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      reservation = await prisma.$transaction(async (tx) => {
+        const occupied = await occupiedSeats(tx, place.id, dateTime, place.reservationDuration);
+        if (occupied + input.partySize > place.reservationCapacity) {
+          throw new ReservationCapacityError();
+        }
+
+        return tx.reservation.create({
+          data: {
+            reference: formatReference(input.date),
+            dateTime,
+            partySize: input.partySize,
+            status,
+            phone: input.phone || null,
+            specialRequest: input.specialRequest || null,
+            customerId: session.user.id,
+            placeId: place.id,
+          },
+          select: { reference: true, status: true },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      break;
+    } catch (error) {
+      if (error instanceof ReservationCapacityError) {
+        return { success: false as const, code: "NO_CAPACITY", error: "Ce créneau vient d’être complet. Choisissez une autre heure." };
+      }
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 2) continue;
+      console.error("Erreur de transaction de réservation:", error);
+      return { success: false as const, code: "NO_CAPACITY", error: "Ce créneau vient d’être complet. Choisissez une autre heure." };
+    }
   }
 
-  const status = place.autoConfirmReservations ? "CONFIRMED" : "PENDING";
-  const reservation = await prisma.reservation.create({
-    data: {
-      reference: formatReference(input.date),
-      dateTime,
-      partySize: input.partySize,
-      status,
-      phone: input.phone || null,
-      specialRequest: input.specialRequest || null,
-      customerId: session.user.id,
-      placeId: place.id,
-    },
-    select: { reference: true, status: true },
-  });
+  if (!reservation) {
+    return { success: false as const, code: "NO_CAPACITY", error: "Ce créneau vient d’être complet. Choisissez une autre heure." };
+  }
 
   revalidatePath(`/places/${place.slug}`);
   revalidatePath("/reservations");

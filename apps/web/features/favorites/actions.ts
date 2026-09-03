@@ -13,6 +13,11 @@ export async function toggleFavorite(placeId: string) {
     }
 
     const userId = session.user.id;
+    const place = await prisma.place.findUnique({
+      where: { id: placeId },
+      select: { slug: true },
+    });
+    if (!place) return { success: false, error: "Établissement introuvable" };
 
     const existingFavorite = await prisma.favorite.findUnique({
       where: {
@@ -33,7 +38,7 @@ export async function toggleFavorite(placeId: string) {
         },
       });
 
-      revalidatePath(`/places/${placeId}`);
+      revalidatePath(`/places/${place.slug}`);
       return { success: true, action: "removed" };
     } else {
       await prisma.favorite.create({
@@ -43,7 +48,7 @@ export async function toggleFavorite(placeId: string) {
         },
       });
 
-      revalidatePath(`/places/${placeId}`);
+      revalidatePath(`/places/${place.slug}`);
       return { success: true, action: "added" };
     }
   } catch (error) {
@@ -74,6 +79,9 @@ export async function getFavorites() {
             },
             media: true,
             reviews: {
+              where: {
+                status: "APPROVED",
+              },
               select: {
                 rating: true,
               },

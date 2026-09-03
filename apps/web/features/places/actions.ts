@@ -123,9 +123,12 @@ export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
         },
       },
       media: true,
-      reviews: {
+      reviews: {
+        where: {
+            status: "APPROVED",
+        },
         select: {
-          rating: true,
+          rating: true,
         },
       },
     },
@@ -199,9 +202,12 @@ export async function listPlacesAction(
             },
           },
           media: true,
-          reviews: {
+          reviews: {
+            where: {
+                status: "APPROVED",
+            },
             select: {
-              rating: true,
+              rating: true,
             },
           },
           favorites: userId
@@ -377,7 +383,7 @@ export async function getPlaceReviews(placeId: string) {
 
     return reviews;
   } catch (error) {
-    console.error("Erreur getPlaceReviews:", error);
+    console.error("Erreur getPlaceRreviews:", error);
     return [];
   }
 }
@@ -493,9 +499,12 @@ export async function getTopRatedPlaces() {
           },
         },
         media: true,
-        reviews: {
+        reviews: {
+          where: {
+              status: "APPROVED",
+          },
           select: {
-            rating: true,
+            rating: true,
           },
         },
         favorites: userId
@@ -509,12 +518,6 @@ export async function getTopRatedPlaces() {
             }
           : false,
       },
-      orderBy: {
-        reviews: {
-          _count: "desc",
-        },
-      },
-      take: 12,
     });
 
     return places.map((place) => ({
@@ -523,7 +526,11 @@ export async function getTopRatedPlaces() {
         ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
         : null,
       isFavorite: place.favorites && place.favorites.length > 0,
-    }));
+    })).sort((left, right) => {
+      const ratingDifference = (right.averageRating ?? -1) - (left.averageRating ?? -1);
+      if (ratingDifference !== 0) return ratingDifference;
+      return right.reviews.length - left.reviews.length;
+    }).slice(0, 12);
   } catch (error) {
     console.error("Erreur getTopRatedPlaces:", error);
     return [];
@@ -539,46 +546,57 @@ export async function getRecommendations() {
     const session = await auth();
     const userId = session?.user?.id;
 
+    const preferredCategories = userId
+      ? await prisma.category.findMany({
+          where: {
+            places: {
+              some: {
+                place: {
+                  OR: [
+                    { favorites: { some: { userId } } },
+                    { reservations: { some: { customerId: userId } } },
+                  ],
+                },
+              },
+            },
+          },
+          select: { id: true },
+        })
+      : [];
+    const preferredCategoryIds = new Set(preferredCategories.map((category) => category.id));
+
     const places = await prisma.place.findMany({
       where: {
         status: "APPROVED",
+        ...(userId ? { favorites: { none: { userId } } } : {}),
       },
       include: {
-        categories: {
-          include: {
-            category: true,
-          },
-        },
+        categories: { include: { category: true } },
         media: true,
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
+        reviews: { where: { status: "APPROVED" }, select: { rating: true } },
         favorites: userId
-          ? {
-              where: {
-                userId: userId,
-              },
-              select: {
-                userId: true,
-              },
-            }
+          ? { where: { userId }, select: { userId: true } }
           : false,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 12,
     });
 
-    return places.map((place) => ({
-      ...place,
-      averageRating: place.reviews.length > 0
-        ? place.reviews.reduce((acc, r) => acc + r.rating, 0) / place.reviews.length
-        : null,
-      isFavorite: place.favorites && place.favorites.length > 0,
-    }));
+    return places.map((place) => {
+      const averageRating = place.reviews.length > 0
+        ? place.reviews.reduce((total, review) => total + review.rating, 0) / place.reviews.length
+        : null;
+      const categoryMatches = place.categories.filter(({ category }) => preferredCategoryIds.has(category.id)).length;
+
+      return {
+        ...place,
+        averageRating,
+        isFavorite: place.favorites && place.favorites.length > 0,
+        recommendationScore: categoryMatches * 10 + (averageRating ?? 0),
+      };
+    }).sort((left, right) => {
+      const scoreDifference = right.recommendationScore - left.recommendationScore;
+      if (scoreDifference !== 0) return scoreDifference;
+      return right.createdAt.getTime() - left.createdAt.getTime();
+    }).slice(0, 12).map(({ recommendationScore: _recommendationScore, ...place }) => place);
   } catch (error) {
     console.error("Erreur getRecommendations:", error);
     return [];

@@ -183,6 +183,7 @@ model Review {
   placeId  String
 
   @@index([placeId, status, createdAt])
+  @@unique([authorId, placeId])
   @@map("reviews")
 }
 
