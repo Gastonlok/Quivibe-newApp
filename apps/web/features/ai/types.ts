@@ -10,6 +10,7 @@ export type QuivibePlace = {
   image: string | null;
   imageAlt: string;
   reservationsEnabled: boolean;
+  amenities: string[];
 };
 
 export type QuivibeRecommendation = QuivibePlace & { reason: string };

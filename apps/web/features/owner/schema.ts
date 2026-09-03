@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AMENITY_VALUES } from "@/features/places/amenities";
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Heure invalide");
 
@@ -19,6 +20,7 @@ export const ownerPlaceUpdateSchema = z
     priceRange: z.coerce.number().int().min(1).max(4),
     phone: z.string().trim().max(30).optional(),
     categoryIds: z.array(z.string().min(1)).min(1),
+    amenities: z.array(z.enum(AMENITY_VALUES)).max(AMENITY_VALUES.length),
     reservationsEnabled: z.boolean(),
     reservationDuration: z.coerce.number().int().min(30).max(360),
     reservationCapacity: z.coerce.number().int().min(1).max(500),

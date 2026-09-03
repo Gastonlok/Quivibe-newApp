@@ -130,6 +130,7 @@ model Place {
   reservationEndTime      String   @default("23:00")
   reservationInterval     Int      @default(30)
   menuVisible             Boolean  @default(false)
+  amenities              String[] @default([])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 

@@ -37,6 +37,7 @@ export default async function MapPage() {
     image: place.media[0]?.url || null,
     imageAlt: place.media[0]?.altText || place.name,
     reservationsEnabled: place.reservationsEnabled,
+    amenities: place.amenities,
   }));
 
   return <QuivibeAiContent places={serialized} />;

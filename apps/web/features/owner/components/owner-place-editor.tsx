@@ -17,6 +17,7 @@ import {
   updateOwnerPlaceAction,
   uploadOwnerPlaceImageAction,
 } from "../actions";
+import { AMENITY_LABELS, AMENITY_VALUES, type Amenity } from "@/features/places/amenities";
 
 type Category = { id: string; name: string; slug: string };
 
@@ -39,6 +40,7 @@ type OwnerPlace = {
   reservationStartTime: string;
   reservationEndTime: string;
   reservationInterval: number;
+  amenities: string[];
   categories: { category: Category }[];
   media: { id: string; url: string; altText: string | null }[];
 };
@@ -68,6 +70,7 @@ export function OwnerPlaceEditor({
     priceRange: place.priceRange,
     phone: place.phone || "",
     categoryIds: place.categories.map(({ category }) => category.id),
+    amenities: place.amenities.filter((amenity): amenity is Amenity => AMENITY_VALUES.includes(amenity as Amenity)),
     reservationsEnabled: place.reservationsEnabled,
     reservationDuration: place.reservationDuration,
     reservationCapacity: place.reservationCapacity,
@@ -93,6 +96,15 @@ export function OwnerPlaceEditor({
       categoryIds: current.categoryIds.includes(categoryId)
         ? current.categoryIds.filter((id) => id !== categoryId)
         : [...current.categoryIds, categoryId],
+    }));
+  }
+
+  function toggleAmenity(amenity: Amenity) {
+    setForm((current) => ({
+      ...current,
+      amenities: current.amenities.includes(amenity)
+        ? current.amenities.filter((value) => value !== amenity)
+        : [...current.amenities, amenity],
     }));
   }
 
@@ -267,6 +279,22 @@ export function OwnerPlaceEditor({
                       className="sr-only"
                     />
                     {category.name}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <fieldset className="mt-6 border-t border-gray-100 pt-6">
+            <legend className="text-sm font-bold text-gray-800">Équipements et ambiance</legend>
+            <p className="mt-1 text-sm text-gray-600">Ces informations permettent à Quivibe AI de recommander votre établissement selon les envies des clients.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {AMENITY_VALUES.map((amenity) => {
+                const selected = form.amenities.includes(amenity);
+                return (
+                  <label key={amenity} className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-extrabold transition ${selected ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 bg-white text-gray-700 hover:border-primary-600"}`}>
+                    <input type="checkbox" checked={selected} onChange={() => toggleAmenity(amenity)} className="sr-only" />
+                    {AMENITY_LABELS[amenity]}
                   </label>
                 );
               })}

@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     orderBy: { name: "asc" },
   });
   const serialized: QuivibePlace[] = places.map((place) => ({
-    id: place.id, slug: place.slug, name: place.name, description: place.description, neighborhood: place.neighborhood, priceRange: place.priceRange,
+    id: place.id, slug: place.slug, name: place.name, description: place.description, neighborhood: place.neighborhood, priceRange: place.priceRange, amenities: place.amenities,
     category: place.categories[0]?.category.name || "Établissement", rating: place.reviews.length ? place.reviews.reduce((sum, review) => sum + review.rating, 0) / place.reviews.length : null,
     image: place.media[0]?.url || null, imageAlt: place.media[0]?.altText || place.name, reservationsEnabled: place.reservationsEnabled,
   }));
