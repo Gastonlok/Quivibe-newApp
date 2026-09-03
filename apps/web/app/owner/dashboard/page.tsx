@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   CalendarCheck2,
+  CheckCircle2,
   MapPin,
   Star,
   Store,
@@ -31,6 +32,9 @@ export default async function OwnerDashboard() {
           where: { status: "APPROVED" },
           select: { rating: true },
         },
+        media: { take: 1, select: { id: true } },
+        menuItems: { take: 1, select: { id: true } },
+        events: { take: 1, select: { id: true } },
         _count: {
           select: {
             reservations: true,
@@ -105,6 +109,9 @@ export default async function OwnerDashboard() {
         ) : (
           <section className="mt-8 grid gap-4 lg:grid-cols-2">
             {places.map((place) => {
+              const checklist = getProfileChecklist(place);
+              const pendingItems = checklist.filter((item) => !item.complete);
+              const completion = Math.round((checklist.filter((item) => item.complete).length / checklist.length) * 100);
               return (
                 <article
                   key={place.id}
@@ -148,6 +155,14 @@ export default async function OwnerDashboard() {
                   <p className="mt-5 text-sm font-semibold text-gray-600">
                     Réservation en ligne : {place.reservationsEnabled ? "activée" : "désactivée"}
                   </p>
+                  <div className="mt-5 rounded-2xl bg-gray-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-extrabold text-gray-900">Fiche complète à {completion}%</p>
+                      {pendingItems.length === 0 && <span className="inline-flex items-center gap-1 text-xs font-extrabold text-primary-700"><CheckCircle2 className="h-4 w-4" /> Prête</span>}
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full rounded-full bg-primary-600" style={{ width: `${completion}%` }} /></div>
+                    {pendingItems.length > 0 && <p className="mt-3 text-sm text-gray-600">À faire : {pendingItems.slice(0, 2).map((item) => item.label).join(" · ")}</p>}
+                  </div>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <Link
                       href={`/owner/places/${place.id}/edit`}
@@ -211,6 +226,24 @@ export default async function OwnerDashboard() {
       </div>
     </main>
   );
+}
+
+function getProfileChecklist(place: {
+  description: string;
+  media: { id: string }[];
+  amenities: string[];
+  menuItems: { id: string }[];
+  events: { id: string }[];
+  reservationsEnabled: boolean;
+}) {
+  return [
+    { label: "ajouter une description détaillée", complete: place.description.length >= 120 },
+    { label: "ajouter une photo", complete: place.media.length > 0 },
+    { label: "renseigner les équipements", complete: place.amenities.length > 0 },
+    { label: "activer les réservations", complete: place.reservationsEnabled },
+    { label: "ajouter votre menu", complete: place.menuItems.length > 0 },
+    { label: "publier un événement", complete: place.events.length > 0 },
+  ];
 }
 
 function StatCard({
