@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { slugify } from "@/utils/slugify";
+import { coordinatesSchema } from "./location-schema";
+import { optionalPhoneSchema } from "@/lib/phone";
+import { priceToMinor, reservationSettingsSchema } from "@/features/reservations/pricing";
 
 // ============================================
 // TYPES
@@ -440,6 +443,12 @@ export async function createPlaceAction(data: any) {
     const name = String(data.name || "").trim();
     const address = String(data.address || "").trim();
     const neighborhood = String(data.neighborhood || "").trim();
+    const coordinates = coordinatesSchema.safeParse(data);
+    const reservationSettings = reservationSettingsSchema.safeParse(data);
+    if (!reservationSettings.success) return { success: false, error: reservationSettings.error.issues[0]?.message || "Paramètres de réservation invalides." };
+    if (!coordinates.success) return { success: false, error: "Sélectionnez un emplacement valide pour l’établissement." };
+    const phone = optionalPhoneSchema.safeParse(data.phone);
+    if (!phone.success) return { success: false, error: "Vérifiez le pays et le numéro de téléphone." };
     if (name.length < 2 || !address || !neighborhood) {
       return {
         success: false,
@@ -463,14 +472,12 @@ export async function createPlaceAction(data: any) {
         description: String(data.description || "").trim(),
         address,
         neighborhood,
-        latitude: Number.isFinite(Number(data.latitude))
-          ? Number(data.latitude)
-          : -4.325,
-        longitude: Number.isFinite(Number(data.longitude))
-          ? Number(data.longitude)
-          : 15.322,
+        ...coordinates.data,
+        reservationsEnabled: reservationSettings.data.reservationsEnabled,
+        reservationPriceMinor: priceToMinor(reservationSettings.data.reservationPrice),
+        reservationCurrency: reservationSettings.data.reservationCurrency,
         priceRange: Math.min(4, Math.max(1, Number(data.priceRange) || 2)),
-        phone: String(data.phone || "").trim() || null,
+        phone: phone.data || null,
         ownerId:
           session.user.role === "ADMIN" && data.ownerId
             ? String(data.ownerId)

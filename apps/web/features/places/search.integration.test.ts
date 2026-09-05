@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { kinshasaDay, toKinshasaDate } from "@/features/reservations/domain";
 import { restaurantSearchSchema, type SearchInput } from "./search-params";
 import { searchRestaurants } from "./search-service";
+import { updateReservationDay } from "@/features/reservations/manager-service";
 
 const url = process.env.RESERVATION_TEST_DATABASE_URL;
 if (url) {
@@ -195,5 +196,38 @@ describe.skipIf(!url)("restaurant search on PostgreSQL", () => {
     await expect(search({ date: "2020-01-01", time: "19:00" })).rejects.toThrow(
       "Choisissez un créneau",
     );
+  });
+
+  it("excludes closed arrivals and whole closed days before paginating search", async () => {
+    const placeId = placeIds[14],
+      actor = { id: ownerId, role: "OWNER" };
+    await updateReservationDay(db, actor, {
+      placeId,
+      date,
+      time: "19:00",
+      closed: true,
+    });
+    expect(
+      (await search({ date, time: "19:00", partySize: "2" })).places.some(
+        (p) => p.id === placeId,
+      ),
+    ).toBe(false);
+    expect(
+      (await search({ date, time: "19:30", partySize: "2" })).places.some(
+        (p) => p.id === placeId,
+      ),
+    ).toBe(true);
+    await updateReservationDay(db, actor, { placeId, date, closed: true });
+    expect(
+      (await search({ date, time: "19:30", partySize: "2" })).places.some(
+        (p) => p.id === placeId,
+      ),
+    ).toBe(false);
+    await updateReservationDay(db, actor, { placeId, date, closed: false });
+    expect(
+      (await search({ date, time: "19:00", partySize: "2" })).places.some(
+        (p) => p.id === placeId,
+      ),
+    ).toBe(true);
   });
 });

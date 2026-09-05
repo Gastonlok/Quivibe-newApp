@@ -36,7 +36,7 @@ export default async function HomePage({
       <div className="container relative z-10 mx-auto -mt-7 px-4 pb-10">
         <div
           data-testid="home-search-dock"
-          className="sticky top-[var(--site-header-height,73px)] z-40 rounded-3xl border border-gray-100 bg-white p-5 shadow-soft sm:p-7"
+          className="relative z-40 rounded-3xl border border-gray-100 bg-white p-5 shadow-soft sm:p-7"
         >
           <h2 className="mb-4 text-xl font-extrabold tracking-tight text-gray-950">
             Trouvez votre prochaine table
@@ -46,7 +46,7 @@ export default async function HomePage({
               <div className="h-32 animate-pulse rounded-2xl bg-gray-50" />
             }
           >
-            <RestaurantSearch />
+            <RestaurantSearch sticky />
           </Suspense>
         </div>
         {topRated.length > 0 && (

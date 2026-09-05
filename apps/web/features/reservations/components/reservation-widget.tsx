@@ -1,5 +1,7 @@
 "use client";
 
+import { PhoneInput } from "@/components/phone-input";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -16,12 +18,15 @@ import {
 } from "../actions";
 import { trackPlaceInteraction } from "@/features/owner/components/place-interaction-tracker";
 import { ensurePlaceVisit } from "@/features/owner/components/visit-session";
-import { kinshasaDay } from "../domain";
+import { kinshasaDay, MAX_BOOKING_DAYS } from "../domain";
+import { formatReservationPrice } from "../pricing";
 
 interface ReservationWidgetProps {
   placeId: string;
   placeSlug: string;
   maxPartySize: number;
+  reservationPriceMinor: number;
+  reservationCurrency: string;
 }
 
 function toLocalDateInput(value: Date) {
@@ -36,6 +41,8 @@ export function ReservationWidget({
   placeId,
   placeSlug,
   maxPartySize,
+  reservationPriceMinor,
+  reservationCurrency,
 }: ReservationWidgetProps) {
   const router = useRouter();
   const busy = useRef(false);
@@ -45,12 +52,19 @@ export function ReservationWidget({
   const [partySize, setPartySize] = useState(2);
   const [time, setTime] = useState("");
   const [slots, setSlots] = useState<string[]>([]);
+  const [dayClosed, setDayClosed] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [quote, setQuote] = useState({
+    amountMinor: reservationPriceMinor,
+    currency: reservationCurrency as "USD" | "CDF",
+  });
   const [confirmation, setConfirmation] = useState<{
     reference: string;
     status: string;
+    amountMinor: number;
+    currency: string;
   } | null>(null);
   const [waitlistMessage, setWaitlistMessage] = useState("");
 
@@ -92,6 +106,10 @@ export function ReservationWidget({
       .then((result) => {
         if (!active) return;
         setSlots(result.slots);
+        if (result.success) {
+          setQuote(result.quote);
+          setDayClosed(result.closed);
+        }
         if (
           requestedSlot.current &&
           result.success &&
@@ -117,7 +135,7 @@ export function ReservationWidget({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy.current) return;
-    if (!time) {
+    if (!time || loadingSlots) {
       setError("Sélectionnez une heure disponible.");
       return;
     }
@@ -133,6 +151,8 @@ export function ReservationWidget({
       partySize,
       phone: String(form.get("phone") || ""),
       specialRequest: String(form.get("specialRequest") || ""),
+      expectedPriceMinor: quote.amountMinor,
+      expectedCurrency: quote.currency,
     };
     const payload = JSON.stringify(input);
     if (request.current?.payload !== payload)
@@ -156,10 +176,38 @@ export function ReservationWidget({
           return;
         }
         setError(result.error);
+        if (
+          [
+            "PRICE_CHANGED",
+            "SLOT_CLOSED",
+            "NO_CAPACITY",
+            "INVALID_SLOT",
+            "DISABLED",
+          ].includes(result.code)
+        ) {
+          // Keep the error visible and require a second explicit confirmation.
+          const refreshed = await getAvailableSlotsAction({
+            placeId,
+            date,
+            partySize,
+          });
+          setSlots(refreshed.slots);
+          if (refreshed.success) {
+            setQuote(refreshed.quote);
+            setDayClosed(refreshed.closed);
+          }
+          if (!refreshed.success || !refreshed.slots.includes(time))
+            setTime("");
+        }
         return;
       }
 
-      setConfirmation({ reference: result.reference, status: result.status });
+      setConfirmation({
+        reference: result.reference,
+        status: result.status,
+        amountMinor: input.expectedPriceMinor,
+        currency: input.expectedCurrency,
+      });
     } catch {
       setError(
         "La réponse n’a pas pu être reçue. Réessayez sans modifier le formulaire ou consultez vos réservations.",
@@ -218,6 +266,11 @@ export function ReservationWidget({
             : "Votre demande a été transmise au restaurant."}
         </p>
         <div className="mt-4 rounded-2xl bg-gray-50 p-4">
+          <p className="mb-3 text-sm font-semibold text-gray-700">
+            {confirmation.amountMinor === 0
+              ? "Réservation gratuite"
+              : `Tarif convenu : ${formatReservationPrice(confirmation.amountMinor, confirmation.currency)} pour la réservation. Règlement auprès de l’établissement ; aucun paiement en ligne effectué.`}
+          </p>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             Référence
           </p>
@@ -245,136 +298,166 @@ export function ReservationWidget({
         Réserver une table
       </h2>
       <p className="mt-1 text-sm text-gray-500">
-        Confirmation rapide, sans frais.
+        Choisissez votre date et votre créneau.
       </p>
+      <div aria-live="polite" className="mt-4 rounded-2xl bg-primary-50 p-4">
+        <p className="font-extrabold text-gray-950">
+          {quote.amountMinor === 0
+            ? "Réservation gratuite"
+            : `${formatReservationPrice(quote.amountMinor, quote.currency)} par réservation`}
+        </p>
+        <p className="mt-1 text-sm leading-6 text-gray-600">
+          {quote.amountMinor === 0
+            ? "Les consommations sont à régler auprès de l’établissement."
+            : "Montant pour tout le groupe, hors consommations. À régler directement auprès de l’établissement. Aucun paiement en ligne."}
+        </p>
+      </div>
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-        <label className="block">
-          <span className="mb-1.5 flex items-center gap-2 text-sm font-bold text-gray-800">
-            <CalendarDays className="h-4 w-4 text-primary-600" />
-            Date
-          </span>
-          <input
-            type="date"
-            name="date"
-            min={toLocalDateInput(new Date())}
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
-
-        <label className="block">
-          <span className="mb-1.5 flex items-center gap-2 text-sm font-bold text-gray-800">
-            <Users className="h-4 w-4 text-primary-600" />
-            Nombre de personnes
-          </span>
-          <select
-            name="partySize"
-            value={partySize}
-            onChange={(event) => setPartySize(Number(event.target.value))}
-            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
-          >
-            {partyOptions.map((value) => (
-              <option key={value} value={value}>
-                {value} personne{value > 1 ? "s" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <fieldset>
-          <legend className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-800">
-            <Clock3 className="h-4 w-4 text-primary-600" />
-            Heure
-          </legend>
-          {loadingSlots ? (
-            <div className="flex min-h-20 items-center justify-center rounded-2xl bg-gray-50">
-              <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
-            </div>
-          ) : slots.length ? (
-            <div className="grid grid-cols-3 gap-2">
-              {slots.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setTime(slot)}
-                  aria-pressed={time === slot}
-                  className={`rounded-full border px-3 py-2 text-sm font-bold transition ${
-                    time === slot
-                      ? "border-primary-600 bg-primary-600 text-white"
-                      : "border-gray-300 bg-white text-gray-800 hover:border-primary-600 hover:text-primary-700"
-                  }`}
-                >
-                  {slot}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
-              <p>Aucun créneau disponible pour cette date.</p>
-              <button
-                type="button"
-                onClick={joinWaitlist}
-                disabled={submitting}
-                className="mt-3 font-bold text-primary-700 hover:underline disabled:opacity-50"
-              >
-                {submitting
-                  ? "Inscription..."
-                  : "Me prévenir si une table se libère"}
-              </button>
-              {waitlistMessage && (
-                <p className="mt-2 font-semibold text-primary-700">
-                  {waitlistMessage}
-                </p>
+        <fieldset disabled={submitting} className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-2 text-sm font-bold text-gray-800">
+              <CalendarDays className="h-4 w-4 text-primary-600" />
+              Date
+            </span>
+            <input
+              type="date"
+              name="date"
+              min={toLocalDateInput(new Date())}
+              max={kinshasaDay(
+                new Date(Date.now() + MAX_BOOKING_DAYS * 86400000),
               )}
-            </div>
-          )}
-        </fieldset>
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
+            />
+          </label>
 
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-bold text-gray-800">
-            Téléphone
-          </span>
-          <input
-            type="tel"
-            name="phone"
-            autoComplete="tel"
-            placeholder="+243 8..."
-            className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-2 text-sm font-bold text-gray-800">
+              <Users className="h-4 w-4 text-primary-600" />
+              Nombre de personnes
+            </span>
+            <select
+              name="partySize"
+              value={partySize}
+              onChange={(event) => setPartySize(Number(event.target.value))}
+              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
+            >
+              {partyOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value} personne{value > 1 ? "s" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-bold text-gray-800">
-            Demande particulière
-          </span>
-          <textarea
-            name="specialRequest"
-            rows={3}
-            maxLength={500}
-            placeholder="Allergie, anniversaire, emplacement..."
-            className="w-full resize-none rounded-2xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
-          />
-        </label>
+          <fieldset>
+            <legend className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-800">
+              <Clock3 className="h-4 w-4 text-primary-600" />
+              Heure
+            </legend>
+            {loadingSlots ? (
+              <div className="flex min-h-20 items-center justify-center rounded-2xl bg-gray-50">
+                <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
+              </div>
+            ) : slots.length ? (
+              <div className="grid grid-cols-3 gap-2">
+                {slots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setTime(slot)}
+                    aria-pressed={time === slot}
+                    className={`rounded-full border px-3 py-2 text-sm font-bold transition ${
+                      time === slot
+                        ? "border-primary-600 bg-primary-600 text-white"
+                        : "border-gray-300 bg-white text-gray-800 hover:border-primary-600 hover:text-primary-700"
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
+                <p>
+                  {dayClosed
+                    ? "Le restaurant n’accepte pas de nouvelles réservations à cette date."
+                    : "Aucun créneau disponible pour cette date."}
+                </p>
+                {!dayClosed && (
+                  <button
+                    type="button"
+                    onClick={joinWaitlist}
+                    disabled={submitting}
+                    className="mt-3 font-bold text-primary-700 hover:underline disabled:opacity-50"
+                  >
+                    {submitting
+                      ? "Inscription..."
+                      : "Me prévenir si une table se libère"}
+                  </button>
+                )}
+                {waitlistMessage && (
+                  <p className="mt-2 font-semibold text-primary-700">
+                    {waitlistMessage}
+                  </p>
+                )}
+              </div>
+            )}
+          </fieldset>
 
-        {error && (
-          <p
-            role="alert"
-            className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700"
+          <PhoneInput />
+
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-bold text-gray-800">
+              Demande particulière
+            </span>
+            <textarea
+              name="specialRequest"
+              rows={3}
+              maxLength={500}
+              placeholder="Allergie, anniversaire, emplacement..."
+              className="w-full resize-none rounded-2xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100"
+            />
+          </label>
+
+          <div
+            role="group"
+            aria-label="Tarif à confirmer"
+            className="border-t border-gray-200 pt-4"
           >
-            {error}
-          </p>
-        )}
+            <p className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-700">
+              <span>Tarif de réservation</span>
+              <strong aria-live="polite" className="text-base text-gray-950">
+                {quote.amountMinor === 0
+                  ? "Gratuit"
+                  : formatReservationPrice(quote.amountMinor, quote.currency)}
+              </strong>
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              Aucun paiement en ligne. Consommations non comprises.
+            </p>
+          </div>
 
-        <button
-          type="submit"
-          disabled={submitting || !time}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-soft transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          Confirmer la réservation
-        </button>
+          {error && (
+            <p
+              role="alert"
+              className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700"
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting || loadingSlots || !time}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-soft transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            Confirmer la réservation
+          </button>
+        </fieldset>
       </form>
     </aside>
   );

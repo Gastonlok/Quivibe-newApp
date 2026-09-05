@@ -14,7 +14,7 @@ const ACTIONS_BY_STATUS: Record<
 > = {
   PENDING: [
     { status: "CONFIRMED", label: "Confirmer" },
-    { status: "CANCELLED", label: "Annuler" },
+    { status: "CANCELLED", label: "Refuser" },
   ],
   CONFIRMED: [
     { status: "COMPLETED", label: "Réalisée" },
@@ -98,7 +98,7 @@ export function OwnerReservationActions({
           }}
         >
           <p className="text-sm font-bold">
-            Confirmer que les clients sont venus
+            Confirmer que les clients sont venus et que le repas a été effectué
           </p>
           <label className="block text-xs font-semibold">
             Montant consommé, facultatif

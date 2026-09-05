@@ -1,4 +1,5 @@
 import { UtensilsCrossed } from "lucide-react";
+import { MenuItemImage } from "./menu-item-image";
 
 type MenuItem = {
   id: string;
@@ -6,6 +7,7 @@ type MenuItem = {
   description: string | null;
   price: string | null;
   category: string | null;
+  imageUrl?: string | null;
 };
 
 export function PlaceMenu({ visible, items }: { visible: boolean; items: MenuItem[] }) {
@@ -36,12 +38,15 @@ export function PlaceMenu({ visible, items }: { visible: boolean; items: MenuIte
             <h3 className="text-sm font-extrabold uppercase tracking-[0.14em] text-orange-800">{group.name}</h3>
             <div className="mt-4 space-y-4">
               {group.items.map((item) => (
-                <article key={item.id} className="flex items-start justify-between gap-5">
-                  <div>
-                    <h4 className="font-extrabold text-gray-950">{item.name}</h4>
-                    {item.description && <p className="mt-1 text-sm leading-6 text-gray-600">{item.description}</p>}
+                <article key={item.id} className="flex items-start gap-3 sm:gap-4">
+                  {item.imageUrl && <MenuItemImage url={item.imageUrl} name={item.name} />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+                      <h4 className="min-w-0 break-words font-extrabold text-gray-950">{item.name}</h4>
+                      {item.price && <span className="break-words font-extrabold text-orange-800">{item.price}</span>}
+                    </div>
+                    {item.description && <p className="mt-1 break-words text-sm leading-6 text-gray-600">{item.description}</p>}
                   </div>
-                  {item.price && <span className="shrink-0 font-extrabold text-orange-800">{item.price}</span>}
                 </article>
               ))}
             </div>

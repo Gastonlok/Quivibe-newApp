@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
@@ -55,7 +56,9 @@ const toggle = <T,>(values: T[], value: T) =>
     ? values.filter((v) => v !== value)
     : [...values, value];
 
-export function RestaurantSearch() {
+export function RestaurantSearch({ sticky = false }: { sticky?: boolean }) {
+  const searchElement = useRef<HTMLElement>(null);
+  const [pinned, setPinned] = useState(false);
   const router = useRouter(),
     params = useSearchParams(),
     query = params.toString();
@@ -70,12 +73,43 @@ export function RestaurantSearch() {
   const [suggestions, setSuggestions] = useState<
     Awaited<ReturnType<typeof restaurantSuggestions>>
   >([]);
-  const [dialog, setDialog] = useState<"availability" | "filters" | null>(null);
+  const [dialog, setDialog] = useState<
+    "search" | "availability" | "filters" | null
+  >(null);
   const [isPending, startTransition] = useTransition();
   const [locating, setLocating] = useState(false),
     [error, setError] = useState("");
   const generation = useRef(0);
   const debounced = useDebounce(draft.search, 250);
+  useEffect(() => {
+    if (!sticky) return;
+    const element = searchElement.current;
+    const header = document.querySelector("header");
+    if (!element || !header) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setPinned(
+        element.getBoundingClientRect().bottom <=
+          header.getBoundingClientRect().bottom,
+      );
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(element);
+    observer.observe(header);
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [sticky]);
   useEffect(() => {
     setDraft(current);
     setError("");
@@ -283,12 +317,8 @@ export function RestaurantSearch() {
       clear: { amenities: current.amenities.filter((v) => v !== a) },
     })),
   ];
-  return (
-    <section
-      data-testid="restaurant-search"
-      aria-label="Recherche et filtres"
-      className="relative"
-    >
+  const searchControls = (
+    <>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -472,26 +502,99 @@ export function RestaurantSearch() {
           </button>
         </div>
       )}
-      {dialog === "availability" && (
+    </>
+  );
+  return (
+    <section
+      ref={searchElement}
+      data-testid="restaurant-search"
+      aria-label="Recherche et filtres"
+      className="relative"
+    >
+      {searchControls}
+      {sticky &&
+        pinned &&
+        createPortal(
+          <div
+            data-testid="compact-search-dock"
+            role="region"
+            aria-label="Recherche rapide"
+            className="fixed inset-x-0 top-[var(--site-header-height,73px)] z-40 border-b border-gray-200 bg-white shadow-sm"
+          >
+            <div className="container flex h-16 items-center gap-2 sm:gap-4">
+              <button
+                type="button"
+                onClick={() => setDialog("search")}
+                aria-label="Modifier la recherche"
+                aria-haspopup="dialog"
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-2 text-left hover:bg-gray-50 focus-visible:outline-primary-600"
+              >
+                <Search
+                  className="h-5 w-5 shrink-0 text-primary-600"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-extrabold text-gray-900">
+                    {draft.search ||
+                      options.categories.find((c) => c.slug === draft.category)
+                        ?.name ||
+                      "Rechercher un lieu"}
+                  </span>
+                  <span className="block truncate text-xs text-gray-500">
+                    {draft.lat !== undefined
+                      ? "Autour de moi"
+                      : location || "Tout Kinshasa"}
+                    {draft.date &&
+                      ` · ${dateLabel} · ${draft.time} · ${draft.partySize} pers.`}
+                  </span>
+                </span>
+                <span className="hidden shrink-0 text-sm font-bold text-primary-700 sm:inline">
+                  Modifier
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialog("filters")}
+                aria-label={`Tous les filtres${advancedCount ? ` (${advancedCount} actifs)` : ""}`}
+                aria-haspopup="dialog"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-gray-200 px-3 text-sm font-bold text-gray-800 hover:border-primary-500 hover:bg-primary-50 focus-visible:outline-primary-600 sm:px-4"
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                Filtres
+                {advancedCount > 0 && (
+                  <span className="rounded-full bg-primary-600 px-1.5 py-0.5 text-xs text-white">
+                    {advancedCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+      {dialog && (
         <SearchDialog
-          title="Quand souhaitez-vous réserver ?"
+          title={
+            dialog === "search"
+              ? "Modifier votre recherche"
+              : dialog === "availability"
+                ? "Quand souhaitez-vous réserver ?"
+                : "Affiner votre recherche"
+          }
           onClose={() => setDialog(null)}
         >
-          <SearchAvailability
-            filters={draft}
-            onApply={(value) => apply({ ...draft, ...value })}
-            onClear={() =>
-              apply({ ...draft, date: "", time: "", partySize: 2 })
-            }
-          />
-        </SearchDialog>
-      )}
-      {dialog === "filters" && (
-        <SearchDialog
-          title="Affiner votre recherche"
-          onClose={() => setDialog(null)}
-        >
-          <AdvancedFilters value={draft} options={options} onApply={apply} />
+          {dialog === "search" ? (
+            <div className="p-5 sm:p-7">{searchControls}</div>
+          ) : dialog === "availability" ? (
+            <SearchAvailability
+              filters={draft}
+              onApply={(value) => apply({ ...draft, ...value })}
+              onClear={() =>
+                apply({ ...draft, date: "", time: "", partySize: 2 })
+              }
+            />
+          ) : (
+            <AdvancedFilters value={draft} options={options} onApply={apply} />
+          )}
         </SearchDialog>
       )}
     </section>

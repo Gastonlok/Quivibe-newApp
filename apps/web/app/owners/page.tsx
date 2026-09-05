@@ -1,5 +1,7 @@
 "use client";
 
+import { PhoneInput } from "@/components/phone-input";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -375,22 +377,7 @@ export default function OwnersPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Téléphone *
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+243 812 345 678"
-                      className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
-                </div>
+                <PhoneInput required value={formData.phone} onChange={(phone) => setFormData((current) => ({ ...current, phone }))} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

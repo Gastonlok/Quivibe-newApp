@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { STATUS_LABELS } from "./domain";
+import { formatReservationPrice } from "./pricing";
 
 type Recipient = {
   id: string;
@@ -60,6 +61,8 @@ export async function queueReservationNotifications(
     status: string;
     dateTime: Date;
     partySize: number;
+    reservationPriceMinor: number;
+    reservationCurrency: string;
     customer: Recipient & { name: string };
     place: { name: string; owner: Recipient };
   },
@@ -72,7 +75,11 @@ export async function queueReservationNotifications(
     timeZone: "Africa/Kinshasa",
   }).format(reservation.dateTime);
   const status = STATUS_LABELS[reservation.status] || reservation.status;
-  const details = `${reservation.place.name}\nRéférence : ${reservation.reference}\n${when} (Kinshasa)\n${reservation.partySize} personne(s)`;
+  const price =
+    reservation.reservationPriceMinor === 0
+      ? "Réservation gratuite, hors consommations."
+      : `Tarif convenu : ${formatReservationPrice(reservation.reservationPriceMinor, reservation.reservationCurrency)} pour la réservation, hors consommations. Règlement directement auprès de l’établissement ; aucun paiement en ligne effectué.`;
+  const details = `${reservation.place.name}\nRéférence : ${reservation.reference}\n${when} (Kinshasa)\n${reservation.partySize} personne(s)\n${price}`;
   const customerText =
     reservation.status === "PENDING"
       ? "Votre demande a été transmise. Attendez la confirmation du restaurant."

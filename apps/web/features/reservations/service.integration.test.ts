@@ -4,6 +4,9 @@ import { PrismaClient } from "@prisma/client";
 import { createReservation, changeReservationStatus } from "./service";
 import { kinshasaDay } from "./domain";
 import { queueNotification } from "./notifications";
+import { getReservationManager, updateReservationDay } from "./manager-service";
+import { getDayAvailability } from "./availability";
+import { reservationDayKey, toKinshasaDate } from "./domain";
 
 const databaseUrl = process.env.RESERVATION_TEST_DATABASE_URL;
 // Opt-in only. The developer runner creates and removes a fresh schema.
@@ -261,10 +264,15 @@ describe.skipIf(!databaseUrl)("reservation PostgreSQL transactions", () => {
   });
 
   it("prevents future outcomes, records exact optional spending and keeps commissions zero", async () => {
-    const p = await place();
+    const p = await place({ reservationPriceMinor: 1250 });
     const r = await saved(
-      (await createReservation(db, customer.id, customer.role, request(p.id)))
-        .reference,
+      (
+        await createReservation(db, customer.id, customer.role, {
+          ...request(p.id),
+          expectedPriceMinor: 1250,
+          expectedCurrency: "USD",
+        })
+      ).reference,
     );
     await expect(
       changeReservationStatus(db, owner, r.id, "COMPLETED", false),
@@ -283,6 +291,8 @@ describe.skipIf(!databaseUrl)("reservation PostgreSQL transactions", () => {
     });
     const updated = await saved(r.reference);
     expect(updated.totalAmount?.toFixed(2)).toBe("9999999999.99");
+    expect(updated.reservationPriceMinor).toBe(1250);
+    expect(updated.reservationCurrency).toBe("USD");
     expect(updated.commissionAmount.toString()).toBe("0");
     expect(updated.history).toHaveLength(2);
     await expect(
@@ -291,6 +301,88 @@ describe.skipIf(!databaseUrl)("reservation PostgreSQL transactions", () => {
         currency: "CDF",
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("snapshots the server price, preserves it after changes and retries without repricing", async () => {
+    const p = await place({
+      reservationPriceMinor: 29,
+      reservationCurrency: "USD",
+    });
+    const input = {
+      ...request(p.id),
+      expectedPriceMinor: 29,
+      expectedCurrency: "USD" as const,
+    };
+    const result = await createReservation(
+      db,
+      customer.id,
+      customer.role,
+      input,
+    );
+    const r = await saved(result.reference);
+    expect(r.reservationPriceMinor).toBe(29);
+    expect(r.reservationCurrency).toBe("USD");
+    expect(r.totalAmount).toBeNull();
+    expect(r.commissionRate.toString()).toBe("0");
+    expect(r.commissionAmount.toString()).toBe("0");
+    expect(r.paymentStatus).toBe("NOT_TRACKED");
+    expect(r.notifications.every((n) => n.body.includes("0,29 USD"))).toBe(
+      true,
+    );
+    await db.place.update({
+      where: { id: p.id },
+      data: { reservationPriceMinor: 50000, reservationCurrency: "CDF" },
+    });
+    const retry = await createReservation(
+      db,
+      customer.id,
+      customer.role,
+      input,
+    );
+    expect(retry.reference).toBe(r.reference);
+    expect(retry.messageIds).toHaveLength(0);
+    await changeReservationStatus(db, customer, r.id, "CANCELLED", true);
+    expect((await saved(r.reference)).reservationPriceMinor).toBe(29);
+    const next = await createReservation(db, customer.id, customer.role, {
+      ...request(p.id),
+      expectedPriceMinor: 50000,
+      expectedCurrency: "CDF",
+    });
+    expect(await saved(next.reference)).toMatchObject({
+      reservationPriceMinor: 50000,
+      reservationCurrency: "CDF",
+    });
+  });
+
+  it("rejects missing, stale or forged quotes and refuses disabled reservations", async () => {
+    const p = await place({
+      reservationPriceMinor: 1500,
+      reservationCurrency: "CDF",
+    });
+    for (const quote of [
+      {},
+      { expectedPriceMinor: 1, expectedCurrency: "CDF" as const },
+      { expectedPriceMinor: 1500, expectedCurrency: "USD" as const },
+    ]) {
+      await expect(
+        createReservation(db, customer.id, customer.role, {
+          ...request(p.id),
+          ...quote,
+        }),
+      ).rejects.toMatchObject({ code: "PRICE_CHANGED" });
+    }
+    expect(await db.reservation.count({ where: { placeId: p.id } })).toBe(0);
+    await db.place.update({
+      where: { id: p.id },
+      data: { reservationsEnabled: false },
+    });
+    await expect(
+      createReservation(db, customer.id, customer.role, {
+        ...request(p.id),
+        expectedPriceMinor: 1500,
+        expectedCurrency: "CDF",
+      }),
+    ).rejects.toMatchObject({ code: "DISABLED" });
   });
 
   it("commits only one of two conflicting outcomes", async () => {
@@ -364,5 +456,187 @@ describe.skipIf(!databaseUrl)("reservation PostgreSQL transactions", () => {
         })
       ).emailStatus,
     ).toBe("SKIPPED");
+  });
+
+  it("closes individual arrivals and whole days without cancelling existing reservations", async () => {
+    const p = await place();
+    const old = await createReservation(
+      db,
+      customer.id,
+      customer.role,
+      request(p.id),
+    );
+    await updateReservationDay(db, owner, {
+      placeId: p.id,
+      date,
+      time: "19:00",
+      closed: true,
+    });
+    expect(
+      (await getDayAvailability(db, p, date)).slots.find(
+        (s) => s.time === "19:00",
+      )?.closed,
+    ).toBe(true);
+    await expect(
+      createReservation(db, stranger.id, stranger.role, request(p.id)),
+    ).rejects.toMatchObject({ code: "SLOT_CLOSED" });
+    expect((await saved(old.reference)).status).toBe("CONFIRMED");
+    await updateReservationDay(db, owner, {
+      placeId: p.id,
+      date,
+      time: "19:00",
+      closed: false,
+    });
+    await createReservation(db, stranger.id, stranger.role, request(p.id));
+    await updateReservationDay(db, owner, {
+      placeId: p.id,
+      date,
+      closed: true,
+    });
+    expect(
+      (await getDayAvailability(db, p, date)).slots.every((s) => s.closed),
+    ).toBe(true);
+    await expect(
+      createReservation(db, customer.id, customer.role, {
+        ...request(p.id),
+        time: "20:00",
+      }),
+    ).rejects.toMatchObject({ code: "SLOT_CLOSED" });
+    await updateReservationDay(db, owner, {
+      placeId: p.id,
+      date,
+      closed: false,
+    });
+    expect(
+      (await getDayAvailability(db, p, date)).slots.every((s) => !s.closed),
+    ).toBe(true);
+    expect(await db.reservation.count({ where: { placeId: p.id } })).toBe(2);
+  });
+
+  it("authorizes availability changes and retains concurrent closures", async () => {
+    const p = await place();
+    const input = { placeId: p.id, date, time: "19:00", closed: true };
+    await expect(
+      updateReservationDay(db, stranger, input),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const unauthorized = await getReservationManager(db, stranger, {
+      placeId: p.id,
+      date,
+      all: false,
+      page: 1,
+    });
+    expect(unauthorized.place).toBeNull();
+    await db.placeCollaborator.create({
+      data: { placeId: p.id, userId: stranger.id, role: "EDITOR" },
+    });
+    await Promise.all([
+      updateReservationDay(db, owner, input),
+      updateReservationDay(db, stranger, { ...input, time: "20:00" }),
+    ]);
+    const day = await db.reservationDay.findUniqueOrThrow({
+      where: { placeId_date: { placeId: p.id, date: reservationDayKey(date) } },
+    });
+    expect(day.closedTimes).toEqual(["19:00", "20:00"]);
+    await expect(
+      updateReservationDay(db, owner, { ...input, time: "03:00" }),
+    ).rejects.toMatchObject({ code: "INVALID_SLOT" });
+    await expect(
+      updateReservationDay(db, owner, { ...input, date: "2020-01-01" }),
+    ).rejects.toMatchObject({ code: "INVALID_DATE" });
+    await expect(
+      updateReservationDay(db, owner, { ...input, date: "2026-02-30" }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("retains the duration at booking after an owner changes the service length", async () => {
+    const p = await place({ reservationDuration: 180, reservationCapacity: 2 });
+    const first = await createReservation(db, customer.id, customer.role, {
+      ...request(p.id),
+      time: "18:00",
+    });
+    expect((await saved(first.reference)).durationMinutes).toBe(180);
+    const changed = await db.place.update({
+      where: { id: p.id },
+      data: { reservationDuration: 30 },
+    });
+    expect(
+      (await getDayAvailability(db, changed, date)).slots.find(
+        (s) => s.time === "20:30",
+      )?.remaining,
+    ).toBe(0);
+    await expect(
+      createReservation(db, stranger.id, stranger.role, {
+        ...request(p.id),
+        time: "20:30",
+      }),
+    ).rejects.toMatchObject({ code: "NO_CAPACITY" });
+    const next = await createReservation(db, stranger.id, stranger.role, {
+      ...request(p.id),
+      time: "21:00",
+    });
+    expect((await saved(next.reference)).durationMinutes).toBe(30);
+  });
+
+  it("does not overcount adjacent groups and reports daily counts independently of pagination", async () => {
+    const p = await place({ reservationCapacity: 6 });
+    await createReservation(db, customer.id, customer.role, {
+      ...request(p.id),
+      partySize: 4,
+      time: "18:00",
+    });
+    await createReservation(db, customer.id, customer.role, {
+      ...request(p.id),
+      partySize: 4,
+      time: "20:00",
+    });
+    await createReservation(db, stranger.id, stranger.role, request(p.id));
+    expect(
+      (await getDayAvailability(db, p, date)).slots.find(
+        (s) => s.time === "19:00",
+      )?.remaining,
+    ).toBe(0);
+    const manager = await getReservationManager(db, owner, {
+      placeId: p.id,
+      date,
+      all: false,
+      page: 1,
+    });
+    expect(manager.summary).toMatchObject({
+      active: 3,
+      guests: 10,
+      pending: 0,
+      completed: 0,
+      noShow: 0,
+    });
+    expect(manager.reservations?.map((r) => r.dateTime)).toEqual(
+      ["18:00", "19:00", "20:00"].map((t) => toKinshasaDate(date, t)),
+    );
+    // Moving through pages must not change the service totals.
+    expect(
+      (
+        await getReservationManager(db, owner, {
+          placeId: p.id,
+          date,
+          all: true,
+          page: 2,
+        })
+      ).summary,
+    ).toEqual(manager.summary);
+  });
+
+  it("uses the same booking horizon in availability and reservation creation", async () => {
+    const p = await place();
+    const farDate = kinshasaDay(new Date(Date.now() + 367 * 86400000));
+    expect(
+      (await getDayAvailability(db, p, farDate)).slots.every(
+        (s) => !s.bookable,
+      ),
+    ).toBe(true);
+    await expect(
+      createReservation(db, customer.id, customer.role, {
+        ...request(p.id),
+        date: farDate,
+      }),
+    ).rejects.toMatchObject({ code: "TOO_FAR" });
   });
 });

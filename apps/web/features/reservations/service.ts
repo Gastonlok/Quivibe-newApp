@@ -6,6 +6,10 @@ import {
   kinshasaDay,
   toKinshasaDate,
   transitionError,
+  MAX_RESERVATION_DURATION,
+  MAX_BOOKING_DAYS,
+  peakOccupiedSeats,
+  reservationDayKey,
 } from "./domain";
 import type { CompletionInput, CreateReservationInput } from "./schema";
 import {
@@ -52,18 +56,18 @@ export async function occupiedSeats(
   dateTime: Date,
   duration: number,
 ) {
-  const result = await db.reservation.aggregate({
+  const result = await db.reservation.findMany({
     where: {
       placeId,
       status: { in: ACTIVE_STATUSES },
       dateTime: {
-        gt: new Date(dateTime.getTime() - duration * 60_000),
+        gt: new Date(dateTime.getTime() - MAX_RESERVATION_DURATION * 60_000),
         lt: new Date(dateTime.getTime() + duration * 60_000),
       },
     },
-    _sum: { partySize: true },
+    select: { dateTime: true, durationMinutes: true, partySize: true },
   });
-  return result._sum.partySize || 0;
+  return peakOccupiedSeats(result, dateTime, duration);
 }
 
 const reservationInclude = {
@@ -93,6 +97,13 @@ export async function createReservation(
         partySize: input.partySize,
         phone: input.phone || null,
         specialRequest: input.specialRequest || null,
+        ...(input.expectedPriceMinor !== undefined ||
+        input.expectedCurrency !== undefined
+          ? {
+              expectedPriceMinor: input.expectedPriceMinor ?? 0,
+              expectedCurrency: input.expectedCurrency ?? "USD",
+            }
+          : {}),
       }),
     )
     .digest("hex");
@@ -124,6 +135,11 @@ export async function createReservation(
       };
     }
     const dateTime = toKinshasaDate(input.date, input.time);
+    if (dateTime.getTime() > Date.now() + MAX_BOOKING_DAYS * 86400000)
+      throw new ReservationError(
+        "TOO_FAR",
+        "Choisissez une date dans l’année à venir.",
+      );
     if (dateTime.getTime() < Date.now() + 60 * 60_000)
       throw new ReservationError(
         "TOO_SOON",
@@ -142,6 +158,16 @@ export async function createReservation(
         "DISABLED",
         "Cet établissement ne prend pas encore de réservations.",
       );
+    // Read the authoritative price inside the booking transaction. A browser
+    // quote can only confirm it, never choose the price or commission.
+    if (
+      (input.expectedPriceMinor ?? 0) !== place.reservationPriceMinor ||
+      (input.expectedCurrency ?? "USD") !== place.reservationCurrency
+    )
+      throw new ReservationError(
+        "PRICE_CHANGED",
+        "Le tarif a changé. Vérifiez le nouveau montant, puis confirmez à nouveau votre réservation.",
+      );
     if (input.partySize > place.maxPartySize)
       throw new ReservationError(
         "PARTY_TOO_LARGE",
@@ -151,6 +177,19 @@ export async function createReservation(
       throw new ReservationError(
         "INVALID_SLOT",
         "Ce créneau n’est plus proposé par l’établissement.",
+      );
+    const day = await tx.reservationDay.findUnique({
+      where: {
+        placeId_date: {
+          placeId: place.id,
+          date: reservationDayKey(input.date),
+        },
+      },
+    });
+    if (day?.closed || day?.closedTimes.includes(input.time))
+      throw new ReservationError(
+        "SLOT_CLOSED",
+        "Le restaurant a fermé ce créneau. Choisissez une autre heure ou une autre date.",
       );
     if (
       (await occupiedSeats(tx, place.id, dateTime, place.reservationDuration)) +
@@ -198,6 +237,11 @@ export async function createReservation(
         source: "QUIVIBE",
         attributedVisitId: visit?.id,
         channel: visit?.channel || "UNKNOWN",
+        reservationPriceMinor: place.reservationPriceMinor,
+        reservationCurrency: place.reservationCurrency,
+        durationMinutes: place.reservationDuration,
+        // Commercial activation and commission policy remain Quivibe's choice.
+        // Neither owner settings nor a booking request can activate collection.
         commissionRate: new Prisma.Decimal(0),
         commissionAmount: new Prisma.Decimal(0),
         paymentStatus: "NOT_TRACKED",

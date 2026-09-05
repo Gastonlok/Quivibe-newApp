@@ -1,4 +1,38 @@
 export const ACTIVE_STATUSES = ["PENDING", "CONFIRMED"];
+export const MAX_RESERVATION_DURATION = 360;
+export const MAX_BOOKING_DAYS = 366;
+
+// DATE columns represent a calendar label, not midnight in a time zone.
+export function reservationDayKey(date: string) {
+  return new Date(`${date}T00:00:00Z`);
+}
+
+export function peakOccupiedSeats(
+  bookings: { dateTime: Date; durationMinutes: number; partySize: number }[],
+  start: Date,
+  duration: number,
+) {
+  const from = start.getTime(),
+    until = from + duration * 60_000;
+  const changes = new Map<number, number>();
+  for (const booking of bookings) {
+    const begins = Math.max(from, booking.dateTime.getTime());
+    const ends = Math.min(
+      until,
+      booking.dateTime.getTime() + booking.durationMinutes * 60_000,
+    );
+    if (begins >= ends) continue;
+    changes.set(begins, (changes.get(begins) || 0) + booking.partySize);
+    changes.set(ends, (changes.get(ends) || 0) - booking.partySize);
+  }
+  let occupied = 0,
+    peak = 0;
+  for (const [, delta] of [...changes].sort(([a], [b]) => a - b)) {
+    occupied += delta;
+    peak = Math.max(peak, occupied);
+  }
+  return peak;
+}
 export const STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
   CONFIRMED: "Confirmée",

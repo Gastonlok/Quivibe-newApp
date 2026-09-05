@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { AMENITY_VALUES } from "@/features/places/amenities";
+import { coordinatesSchema } from "@/features/places/location-schema";
+import { optionalPhoneSchema } from "@/lib/phone";
+import { reservationSettingsSchema } from "@/features/reservations/pricing";
 
-const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Heure invalide");
+const timeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Heure invalide");
 
 function timeToMinutes(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
@@ -15,13 +20,17 @@ export const ownerPlaceUpdateSchema = z
     description: z.string().trim().min(20).max(2_000),
     address: z.string().trim().min(5).max(200),
     neighborhood: z.string().trim().min(2).max(100),
-    latitude: z.coerce.number().min(-90).max(90),
-    longitude: z.coerce.number().min(-180).max(180),
+    ...coordinatesSchema.shape,
     priceRange: z.coerce.number().int().min(1).max(4),
-    phone: z.string().trim().max(30).optional(),
+    phone: optionalPhoneSchema,
     categoryIds: z.array(z.string().min(1)).min(1),
     amenities: z.array(z.enum(AMENITY_VALUES)).max(AMENITY_VALUES.length),
+    ...reservationSettingsSchema.shape,
     reservationsEnabled: z.boolean(),
+    reservationPrice:
+      reservationSettingsSchema.shape.reservationPrice.removeDefault(),
+    reservationCurrency:
+      reservationSettingsSchema.shape.reservationCurrency.removeDefault(),
     reservationDuration: z.coerce.number().int().min(30).max(360),
     reservationCapacity: z.coerce.number().int().min(1).max(500),
     maxPartySize: z.coerce.number().int().min(1).max(50),
@@ -54,7 +63,8 @@ export const ownerPlaceUpdateSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["maxPartySize"],
-        message: "Le nombre maximal par table ne peut pas depasser la capacite.",
+        message:
+          "Le nombre maximal par table ne peut pas depasser la capacite.",
       });
     }
   });
@@ -71,13 +81,18 @@ const ownerMenuItemSchema = z.object({
   price: z.string().trim().max(40).optional(),
   category: z.string().trim().max(80).optional(),
   available: z.boolean(),
+  imageUrl: z.string().url().max(2000).nullable().optional(),
 });
 
 export const ownerPlaceMenuUpdateSchema = z.object({
   placeId: z.string().min(1),
   menuVisible: z.boolean(),
-  items: z.array(ownerMenuItemSchema).max(100, "Le menu ne peut pas contenir plus de 100 plats."),
+  items: z
+    .array(ownerMenuItemSchema)
+    .max(100, "Le menu ne peut pas contenir plus de 100 plats."),
 });
 
 export type OwnerPlaceUpdateInput = z.infer<typeof ownerPlaceUpdateSchema>;
-export type OwnerPlaceMenuUpdateInput = z.infer<typeof ownerPlaceMenuUpdateSchema>;
+export type OwnerPlaceMenuUpdateInput = z.infer<
+  typeof ownerPlaceMenuUpdateSchema
+>;

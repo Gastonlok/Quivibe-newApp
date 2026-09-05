@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatReservationPrice } from "@/features/reservations/pricing";
 import { redirect } from "next/navigation";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import { auth } from "@/lib/auth";
@@ -116,6 +117,11 @@ export default async function ReservationsPage() {
 
                       <p className="mt-4 text-xs font-bold uppercase tracking-wide text-gray-500">
                         Référence {reservation.reference}
+                      </p>
+                      <p className="mt-3 text-sm font-semibold text-gray-700">
+                        {reservation.reservationPriceMinor === 0
+                          ? "Réservation gratuite"
+                          : `Tarif convenu : ${formatReservationPrice(reservation.reservationPriceMinor, reservation.reservationCurrency)} pour la réservation, hors consommations. Aucun paiement en ligne effectué.`}
                       </p>
                     </div>
 

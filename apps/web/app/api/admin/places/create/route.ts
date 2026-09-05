@@ -4,16 +4,17 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAdminActor } from "@/features/admin/access";
 import { slugify } from "@/utils/slugify";
+import { coordinatesSchema } from "@/features/places/location-schema";
+import { optionalPhoneSchema } from "@/lib/phone";
 const schema = z
   .object({
     name: z.string().trim().min(2).max(120),
     description: z.string().trim().max(2000).default(""),
     address: z.string().trim().min(3).max(200),
     neighborhood: z.string().trim().min(2).max(100),
-    latitude: z.coerce.number().min(-90).max(90),
-    longitude: z.coerce.number().min(-180).max(180),
+    ...coordinatesSchema.shape,
     priceRange: z.coerce.number().int().min(1).max(4),
-    phone: z.string().trim().max(30).optional(),
+    phone: optionalPhoneSchema,
     ownerId: z.string().max(100).optional(),
     status: z.enum(["PENDING", "APPROVED", "REJECTED"]).default("APPROVED"),
   })

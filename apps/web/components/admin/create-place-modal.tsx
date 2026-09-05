@@ -12,6 +12,9 @@ import {
   User,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { PhoneInput } from "@/components/phone-input";
+import { LocationPicker } from "@/features/places/components/location-picker";
+import type { PlaceCoordinates } from "@/features/places/location-schema";
 
 // ============================================
 // HOOK PERSONNALISÉ - DEBOUNCE
@@ -53,6 +56,8 @@ export function CreatePlaceModal({
 }: CreatePlaceModalProps) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [position, setPosition] = useState<PlaceCoordinates | null>(null);
+  const [error, setError] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -66,8 +71,6 @@ export function CreatePlaceModal({
     description: "",
     address: "",
     neighborhood: "",
-    latitude: "",
-    longitude: "",
     priceRange: "2",
     phone: "",
     ownerId: "",
@@ -110,6 +113,11 @@ export function CreatePlaceModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    if (!position) {
+      setError("Sélectionnez l’emplacement sur la carte ou utilisez votre position.");
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -118,8 +126,7 @@ export function CreatePlaceModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          latitude: parseFloat(formData.latitude) || 0,
-          longitude: parseFloat(formData.longitude) || 0,
+          ...position,
           priceRange: parseInt(formData.priceRange),
           status: "APPROVED",
         }),
@@ -129,9 +136,12 @@ export function CreatePlaceModal({
         onSuccess();
         onClose();
         resetForm();
+      } else {
+        const result = await res.json().catch(() => ({}));
+        setError(result.error || "Impossible de créer l’établissement.");
       }
     } catch (error) {
-      console.error("Erreur:", error);
+      setError("Connexion interrompue. Réessayez.");
     } finally {
       setSubmitting(false);
     }
@@ -143,13 +153,13 @@ export function CreatePlaceModal({
       description: "",
       address: "",
       neighborhood: "",
-      latitude: "",
-      longitude: "",
       priceRange: "2",
       phone: "",
       ownerId: "",
     });
     setSelectedUser(null);
+    setPosition(null);
+    setError("");
     setSearchQuery("");
   };
 
@@ -194,6 +204,7 @@ export function CreatePlaceModal({
 
             {/* Formulaire */}
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
               {loading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
@@ -300,58 +311,8 @@ export function CreatePlaceModal({
                     </div>
                   </div>
 
-                  {/* Coordonnées */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Latitude
-                      </label>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        placeholder="-4.325"
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        value={formData.latitude}
-                        onChange={(e) =>
-                          setFormData({ ...formData, latitude: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Longitude
-                      </label>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        placeholder="15.325"
-                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        value={formData.longitude}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            longitude: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/* Téléphone */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Téléphone
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="+243 812 345 678"
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                    />
-                  </div>
+                  <LocationPicker value={position} onChange={setPosition} />
+                  <PhoneInput value={formData.phone} onChange={(phone) => setFormData((current) => ({ ...current, phone }))} />
 
                   {/* ✅ Recherche d'utilisateur avec debounce */}
                   <div>

@@ -1,14 +1,25 @@
 import { z } from "zod";
+import { coordinatesSchema } from "./location-schema";
+import { optionalPhoneSchema } from "@/lib/phone";
+import { reservationSettingsSchema } from "@/features/reservations/pricing";
 
 export const createPlaceSchema = z.object({
-  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères").max(120),
-  description: z.string().min(20, "Décris ton établissement en quelques phrases (20 caractères minimum)"),
+  name: z
+    .string()
+    .min(2, "Le nom doit contenir au moins 2 caractères")
+    .max(120),
+  description: z
+    .string()
+    .min(
+      20,
+      "Décris ton établissement en quelques phrases (20 caractères minimum)",
+    ),
   address: z.string().min(5, "Adresse trop courte"),
   neighborhood: z.string().min(2, "Quartier requis"),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
+  ...coordinatesSchema.shape,
+  ...reservationSettingsSchema.shape,
   priceRange: z.coerce.number().int().min(1).max(4),
-  phone: z.string().optional(),
+  phone: optionalPhoneSchema,
   categoryIds: z.array(z.string()).min(1, "Sélectionne au moins une catégorie"),
 });
 

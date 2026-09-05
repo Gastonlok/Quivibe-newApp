@@ -13,6 +13,7 @@ export function SearchDialog({
   children: React.ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
+    closeButton = useRef<HTMLButtonElement>(null),
     titleId = useId();
   useEffect(() => {
     const element = dialog.current;
@@ -29,6 +30,9 @@ export function SearchDialog({
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     };
   }, []);
+  useEffect(() => {
+    closeButton.current?.focus({ preventScroll: true });
+  }, [title]);
   return (
     <dialog
       ref={dialog}
@@ -47,6 +51,7 @@ export function SearchDialog({
           {title}
         </h2>
         <button
+          ref={closeButton}
           type="button"
           onClick={onClose}
           aria-label="Fermer les filtres"

@@ -3,6 +3,10 @@ import {
   ACTIVE_STATUSES,
   getScheduleSlots,
   toKinshasaDate,
+  MAX_RESERVATION_DURATION,
+  MAX_BOOKING_DAYS,
+  peakOccupiedSeats,
+  reservationDayKey,
 } from "@/features/reservations/domain";
 import { distanceKm, type RestaurantSearch } from "./search-params";
 
@@ -64,6 +68,16 @@ export function searchWhere(
       ? { reservationsEnabled: true }
       : {}),
     ...(filters.date ? { maxPartySize: { gte: filters.partySize } } : {}),
+    ...(filters.date
+      ? {
+          reservationDays: {
+            none: {
+              date: reservationDayKey(filters.date),
+              OR: [{ closed: true }, { closedTimes: { has: filters.time } }],
+            },
+          },
+        }
+      : {}),
     ...(filters.eventsOnly
       ? { events: { some: { status: "APPROVED", startDate: { gte: now } } } }
       : {}),
@@ -83,7 +97,7 @@ export async function searchRestaurants(
   if (
     when &&
     (when.getTime() < now.getTime() + 60 * 60_000 ||
-      when.getTime() > now.getTime() + 366 * 86400000)
+      when.getTime() > now.getTime() + MAX_BOOKING_DAYS * 86400000)
   )
     throw new Error(
       "Choisissez un créneau entre une heure et un an à partir de maintenant.",
@@ -132,11 +146,16 @@ export async function searchRestaurants(
             placeId: { in: candidates.map((p) => p.id) },
             status: { in: ACTIVE_STATUSES },
             dateTime: {
-              gt: new Date(when.getTime() - maxDuration * 60_000),
+              gt: new Date(when.getTime() - MAX_RESERVATION_DURATION * 60_000),
               lt: new Date(when.getTime() + maxDuration * 60_000),
             },
           },
-          select: { placeId: true, dateTime: true, partySize: true },
+          select: {
+            placeId: true,
+            dateTime: true,
+            partySize: true,
+            durationMinutes: true,
+          },
         })
       : [];
   const seats = new Map<string, typeof booked>();
@@ -163,13 +182,11 @@ export async function searchRestaurants(
         return false;
       if (!when) return true;
       if (!getScheduleSlots(p).includes(filters.time)) return false;
-      const occupied = (seats.get(p.id) || [])
-        .filter(
-          (r) =>
-            Math.abs(r.dateTime.getTime() - when.getTime()) <
-            p.reservationDuration * 60_000,
-        )
-        .reduce((sum, r) => sum + r.partySize, 0);
+      const occupied = peakOccupiedSeats(
+        seats.get(p.id) || [],
+        when,
+        p.reservationDuration,
+      );
       return occupied + filters.partySize <= p.reservationCapacity;
     });
   matches.sort((a, b) => {

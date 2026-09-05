@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { optionalPhoneSchema } from "@/lib/phone";
 
 const ownerRequestSchema = z.object({
   establishmentName: z.string().trim().min(2).max(120),
   contactName: z.string().trim().min(2).max(120),
   email: z.string().trim().email(),
-  phone: z.string().trim().min(6).max(30),
+  phone: optionalPhoneSchema.refine((value) => Boolean(value), "Téléphone requis."),
   address: z.string().trim().max(250).optional(),
   establishmentType: z.string().trim().min(2).max(60),
   message: z.string().trim().max(1200).optional(),

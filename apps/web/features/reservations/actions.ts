@@ -16,11 +16,13 @@ import {
   type CreateReservationInput,
   type CompletionInput,
 } from "./schema";
-import { getScheduleSlots, toKinshasaDate } from "./domain";
+import { toKinshasaDate } from "./domain";
+import { getDayAvailability } from "./availability";
+import { updateReservationDay } from "./manager-service";
+import type { ReservationDayUpdateInput } from "./schema";
 import {
   changeReservationStatus,
   createReservation,
-  occupiedSeats,
   ReservationError,
 } from "./service";
 
@@ -74,12 +76,15 @@ export async function getAvailableSlotsAction(raw: {
   const place = await prisma.place.findFirst({
     where: { id: input.placeId, status: "APPROVED", reservationsEnabled: true },
     select: {
+      id: true,
       reservationCapacity: true,
       reservationDuration: true,
       maxPartySize: true,
       reservationStartTime: true,
       reservationEndTime: true,
       reservationInterval: true,
+      reservationPriceMinor: true,
+      reservationCurrency: true,
     },
   });
   if (!place)
@@ -94,23 +99,44 @@ export async function getAvailableSlotsAction(raw: {
       slots: [],
       error: "Nombre de personnes non autorisé.",
     };
-  const slots: string[] = [];
-  for (const time of getScheduleSlots(place)) {
-    const dateTime = toKinshasaDate(input.date, time);
-    if (dateTime.getTime() < Date.now() + 60 * 60_000) continue;
-    if (
-      (await occupiedSeats(
-        prisma,
-        input.placeId,
-        dateTime,
-        place.reservationDuration,
-      )) +
-        input.partySize <=
-      place.reservationCapacity
+  const availability = await getDayAvailability(prisma, place, input.date);
+  const slots = availability.slots
+    .filter(
+      (slot) =>
+        !slot.closed && slot.bookable && slot.remaining >= input.partySize,
     )
-      slots.push(time);
+    .map((slot) => slot.time);
+  return {
+    success: true as const,
+    slots,
+    closed: availability.closed,
+    quote: {
+      amountMinor: place.reservationPriceMinor,
+      currency: place.reservationCurrency as "USD" | "CDF",
+    },
+  };
+}
+
+export async function updateReservationDayAction(
+  raw: ReservationDayUpdateInput,
+) {
+  const session = await auth();
+  if (!session?.user?.id)
+    return { success: false as const, error: "Connexion requise." };
+  try {
+    const result = await updateReservationDay(prisma, session.user, raw);
+    for (const path of [
+      "/owner/reservations",
+      "/owner/dashboard",
+      "/discover",
+      "/",
+      `/places/${result.slug}`,
+    ])
+      revalidatePath(path);
+    return { success: true as const };
+  } catch (error) {
+    return failure(error);
   }
-  return { success: true as const, slots };
 }
 
 export async function createReservationAction(raw: CreateReservationInput) {

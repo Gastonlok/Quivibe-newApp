@@ -4,6 +4,8 @@ import {
   kinshasaDay,
   toKinshasaDate,
   transitionError,
+  peakOccupiedSeats,
+  reservationDayKey,
 } from "./domain";
 
 it("uses the date in Kinshasa at month boundaries", () => {
@@ -34,4 +36,47 @@ it("handles invalid schedules without looping forever", () => {
       reservationInterval: 0,
     }),
   ).toEqual([]);
+});
+
+it("counts the peak occupancy, not the sum of groups arriving in succession", () => {
+  const booking = (
+    time: string,
+    durationMinutes: number,
+    partySize: number,
+  ) => ({
+    dateTime: toKinshasaDate("2026-10-01", time),
+    durationMinutes,
+    partySize,
+  });
+  const bookings = [booking("18:00", 120, 4), booking("20:00", 120, 4)];
+  expect(
+    peakOccupiedSeats(bookings, toKinshasaDate("2026-10-01", "19:00"), 120),
+  ).toBe(4);
+  expect(
+    peakOccupiedSeats(
+      [...bookings, booking("19:30", 60, 2)],
+      toKinshasaDate("2026-10-01", "19:00"),
+      120,
+    ),
+  ).toBe(6);
+  expect(
+    peakOccupiedSeats(bookings, toKinshasaDate("2026-10-01", "22:00"), 120),
+  ).toBe(0);
+});
+
+it("preserves long booking durations and handles bookings across midnight", () => {
+  const booking = {
+    dateTime: toKinshasaDate("2026-09-30", "23:00"),
+    durationMinutes: 180,
+    partySize: 5,
+  };
+  expect(
+    peakOccupiedSeats([booking], toKinshasaDate("2026-10-01", "01:30"), 30),
+  ).toBe(5);
+  expect(
+    peakOccupiedSeats([booking], toKinshasaDate("2026-10-01", "02:00"), 30),
+  ).toBe(0);
+  expect(reservationDayKey("2026-10-01").toISOString()).toBe(
+    "2026-10-01T00:00:00.000Z",
+  );
 });

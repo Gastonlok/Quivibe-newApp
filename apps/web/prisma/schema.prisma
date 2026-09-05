@@ -245,6 +245,8 @@ model Place {
   phone                   String?
   status                  String   @default("PENDING")
   reservationsEnabled     Boolean  @default(true)
+  reservationPriceMinor   Int      @default(0)
+  reservationCurrency     String   @default("USD")
   reservationDuration     Int      @default(120)
   reservationCapacity     Int      @default(40)
   maxPartySize            Int      @default(12)
@@ -267,6 +269,7 @@ model Place {
   events       Event[]
   media        Media[]
   reservations Reservation[]
+  reservationDays ReservationDay[]
   visits       PlaceVisit[]
   menuItems    MenuItem[]
   collaborators PlaceCollaborator[]
@@ -285,6 +288,7 @@ model MenuItem {
   description String?
   price       String?
   category    String?
+  imageUrl    String?
   available   Boolean  @default(true)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
@@ -444,6 +448,10 @@ model Reservation {
   source         String @default("QUIVIBE")
   channel        String @default("UNKNOWN")
   attributedVisitId String?
+  // Price agreed at booking; independent of the eventual reported bill.
+  reservationPriceMinor Int @default(0)
+  reservationCurrency String @default("USD")
+  durationMinutes Int @default(120)
   totalAmount    Decimal? @db.Decimal(12, 2)
   currency       String?
   commissionRate Decimal @default(0) @db.Decimal(5, 4)
@@ -463,6 +471,20 @@ model Reservation {
   @@index([placeId, createdAt])
   @@index([attributedVisitId])
   @@map("reservations")
+}
+
+model ReservationDay {
+  id String @id @default(cuid())
+  placeId String
+  date DateTime @db.Date
+  closed Boolean @default(false)
+  closedTimes String[] @default([])
+  updatedAt DateTime @updatedAt
+  updatedById String?
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@unique([placeId, date])
+  @@map("reservation_days")
 }
 
 model ReservationStatusEvent {

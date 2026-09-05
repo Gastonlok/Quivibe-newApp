@@ -17,14 +17,25 @@ export const dynamic = "force-dynamic";
 export default async function OwnerDashboard() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/owner/dashboard");
-  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) redirect("/");
+  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role)))
+    redirect("/");
 
   const ownerFilter =
     session.user.role === "ADMIN"
       ? {}
-      : { OR: [{ ownerId: session.user.id }, { collaborators: { some: { userId: session.user.id } } }] };
+      : {
+          OR: [
+            { ownerId: session.user.id },
+            { collaborators: { some: { userId: session.user.id } } },
+          ],
+        };
 
-  const [places, upcomingReservations] = await Promise.all([
+  const upcomingWhere = {
+    dateTime: { gte: new Date() },
+    status: { in: ["PENDING", "CONFIRMED"] },
+    ...(session.user.role === "ADMIN" ? {} : { place: ownerFilter }),
+  };
+  const [places, upcomingReservations, upcomingCount] = await Promise.all([
     prisma.place.findMany({
       where: ownerFilter,
       include: {
@@ -44,13 +55,7 @@ export default async function OwnerDashboard() {
       orderBy: { createdAt: "desc" },
     }),
     prisma.reservation.findMany({
-      where: {
-        dateTime: { gte: new Date() },
-        status: { in: ["PENDING", "CONFIRMED"] },
-        ...(session.user.role === "ADMIN"
-          ? {}
-          : { place: ownerFilter }),
-      },
+      where: upcomingWhere,
       include: {
         customer: { select: { name: true, email: true } },
         place: { select: { name: true } },
@@ -58,9 +63,12 @@ export default async function OwnerDashboard() {
       orderBy: { dateTime: "asc" },
       take: 4,
     }),
+    prisma.reservation.count({ where: upcomingWhere }),
   ]);
 
-  const ratings = places.flatMap((place) => place.reviews.map((review) => review.rating));
+  const ratings = places.flatMap((place) =>
+    place.reviews.map((review) => review.rating),
+  );
   const averageRating =
     ratings.length > 0
       ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
@@ -82,7 +90,11 @@ export default async function OwnerDashboard() {
 
         <section className="mt-8 grid gap-4 sm:grid-cols-3">
           <StatCard icon={Store} label="Établissements" value={places.length} />
-          <StatCard icon={CalendarCheck2} label="Réservations à venir" value={upcomingReservations.length} />
+          <StatCard
+            icon={CalendarCheck2}
+            label="Réservations à venir"
+            value={upcomingCount}
+          />
           <StatCard
             icon={Star}
             label="Note moyenne"
@@ -97,7 +109,8 @@ export default async function OwnerDashboard() {
               Aucun établissement rattaché
             </h2>
             <p className="mt-2 text-gray-600">
-              Ajoutez votre première fiche ; elle sera publiée après validation administrative.
+              Ajoutez votre première fiche ; elle sera publiée après validation
+              administrative.
             </p>
             <Link
               href="/places/new"
@@ -111,7 +124,11 @@ export default async function OwnerDashboard() {
             {places.map((place) => {
               const checklist = getProfileChecklist(place);
               const pendingItems = checklist.filter((item) => !item.complete);
-              const completion = Math.round((checklist.filter((item) => item.complete).length / checklist.length) * 100);
+              const completion = Math.round(
+                (checklist.filter((item) => item.complete).length /
+                  checklist.length) *
+                  100,
+              );
               return (
                 <article
                   key={place.id}
@@ -123,13 +140,15 @@ export default async function OwnerDashboard() {
                         <h2 className="text-xl font-extrabold text-gray-950">
                           {place.name}
                         </h2>
-                        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-                          place.status === "APPROVED"
-                            ? "bg-primary-50 text-primary-700"
-                            : place.status === "REJECTED"
-                              ? "bg-red-50 text-red-700"
-                              : "bg-amber-50 text-amber-800"
-                        }`}>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-extrabold ${
+                            place.status === "APPROVED"
+                              ? "bg-primary-50 text-primary-700"
+                              : place.status === "REJECTED"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-amber-50 text-amber-800"
+                          }`}
+                        >
                           {place.status === "APPROVED"
                             ? "Publié"
                             : place.status === "REJECTED"
@@ -153,15 +172,35 @@ export default async function OwnerDashboard() {
                   </div>
 
                   <p className="mt-5 text-sm font-semibold text-gray-600">
-                    Réservation en ligne : {place.reservationsEnabled ? "activée" : "désactivée"}
+                    Réservation en ligne :{" "}
+                    {place.reservationsEnabled ? "activée" : "désactivée"}
                   </p>
                   <div className="mt-5 rounded-2xl bg-gray-50 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-extrabold text-gray-900">Fiche complète à {completion}%</p>
-                      {pendingItems.length === 0 && <span className="inline-flex items-center gap-1 text-xs font-extrabold text-primary-700"><CheckCircle2 className="h-4 w-4" /> Prête</span>}
+                      <p className="text-sm font-extrabold text-gray-900">
+                        Fiche complète à {completion}%
+                      </p>
+                      {pendingItems.length === 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs font-extrabold text-primary-700">
+                          <CheckCircle2 className="h-4 w-4" /> Prête
+                        </span>
+                      )}
                     </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full rounded-full bg-primary-600" style={{ width: `${completion}%` }} /></div>
-                    {pendingItems.length > 0 && <p className="mt-3 text-sm text-gray-600">À faire : {pendingItems.slice(0, 2).map((item) => item.label).join(" · ")}</p>}
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className="h-full rounded-full bg-primary-600"
+                        style={{ width: `${completion}%` }}
+                      />
+                    </div>
+                    {pendingItems.length > 0 && (
+                      <p className="mt-3 text-sm text-gray-600">
+                        À faire :{" "}
+                        {pendingItems
+                          .slice(0, 2)
+                          .map((item) => item.label)
+                          .join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <Link
@@ -169,6 +208,13 @@ export default async function OwnerDashboard() {
                       className="inline-flex items-center gap-2 rounded-full bg-gray-950 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-gray-800"
                     >
                       <Settings2 className="h-4 w-4" /> Gérer la fiche
+                    </Link>
+                    <Link
+                      href={`/owner/reservations?placeId=${place.id}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-extrabold text-primary-700"
+                    >
+                      <CalendarCheck2 className="h-4 w-4" />
+                      Planning et disponibilités
                     </Link>
                   </div>
                 </article>
@@ -206,7 +252,8 @@ export default async function OwnerDashboard() {
                         {reservation.customer.name}
                       </p>
                       <p className="mt-1 text-sm text-gray-500">
-                        {reservation.place.name} · {reservation.partySize} personne{reservation.partySize > 1 ? "s" : ""}
+                        {reservation.place.name} · {reservation.partySize}{" "}
+                        personne{reservation.partySize > 1 ? "s" : ""}
                       </p>
                     </div>
                     <div className="text-right text-sm font-bold text-primary-700">
@@ -221,7 +268,6 @@ export default async function OwnerDashboard() {
               )}
             </div>
           </div>
-
         </section>
       </div>
     </main>
@@ -237,9 +283,15 @@ function getProfileChecklist(place: {
   reservationsEnabled: boolean;
 }) {
   return [
-    { label: "ajouter une description détaillée", complete: place.description.length >= 120 },
+    {
+      label: "ajouter une description détaillée",
+      complete: place.description.length >= 120,
+    },
     { label: "ajouter une photo", complete: place.media.length > 0 },
-    { label: "renseigner les équipements", complete: place.amenities.length > 0 },
+    {
+      label: "renseigner les équipements",
+      complete: place.amenities.length > 0,
+    },
     { label: "activer les réservations", complete: place.reservationsEnabled },
     { label: "ajouter votre menu", complete: place.menuItems.length > 0 },
     { label: "publier un événement", complete: place.events.length > 0 },
@@ -260,7 +312,9 @@ function StatCard({
       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
         <Icon className="h-5 w-5" />
       </div>
-      <p className="mt-5 text-3xl font-extrabold tracking-tight text-gray-950">{value}</p>
+      <p className="mt-5 text-3xl font-extrabold tracking-tight text-gray-950">
+        {value}
+      </p>
       <p className="mt-1 text-sm font-bold text-gray-500">{label}</p>
     </div>
   );

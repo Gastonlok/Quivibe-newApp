@@ -72,7 +72,6 @@ export default async function PlacePage({ params }: PlacePageProps) {
               <a href="#a-propos" className="shrink-0 border-b-4 border-gray-950 px-1 pb-4 text-gray-950">À propos</a>
               {place.menuVisible && place.menuItems.length > 0 && <a href="#menu" className="shrink-0 px-1 pb-4 hover:text-gray-950">Menu</a>}
               <a href="#avis" className="shrink-0 px-1 pb-4 hover:text-gray-950">Avis</a>
-              <a href="#laisser-un-avis" className="shrink-0 rounded-full bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700">Laisser un avis</a>
             </nav>
 
             <section id="a-propos" className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
@@ -98,6 +97,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
                   placeId={place.id}
                   placeSlug={place.slug}
                   maxPartySize={place.maxPartySize}
+                  reservationPriceMinor={place.reservationPriceMinor}
+                  reservationCurrency={place.reservationCurrency}
                 />
               ) : (
                 <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
