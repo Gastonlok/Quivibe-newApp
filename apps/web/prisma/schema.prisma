@@ -21,6 +21,8 @@ model User {
   image           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  suspendedAt     DateTime?
+  moderationPermissions String[] @default([])
 
   accounts      Account[]
   sessions      Session[]
@@ -34,8 +36,61 @@ model User {
   reviewResponses OwnerReviewResponse[]
   waitlistEntries ReservationWaitlist[]
   reviewReports ReviewReport[]
+  adminMessages AdminMessage[]
+  receivedMessages MessageRecipient[]
+  adminAuditLogs AdminAuditLog[]
 
   @@map("users")
+}
+
+model AdminMessage {
+  id         String @id @default(cuid())
+  requestKey String @unique
+  requestFingerprint String
+  subject    String
+  body       String
+  audience   String
+  sendEmail  Boolean @default(false)
+  createdAt  DateTime @default(now())
+  senderId   String?
+  sender     User? @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  recipients MessageRecipient[]
+
+  @@index([createdAt])
+  @@map("admin_messages")
+}
+
+model MessageRecipient {
+  id           String @id @default(cuid())
+  messageId    String
+  userId       String
+  readAt       DateTime?
+  emailStatus  String @default("NOT_REQUESTED")
+  emailAttempts Int @default(0)
+  emailAttemptAt DateTime?
+  emailFirstAttemptAt DateTime?
+  emailSentAt  DateTime?
+  emailError   String?
+  message      AdminMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId, readAt])
+  @@index([emailStatus, emailAttemptAt])
+  @@map("message_recipients")
+}
+
+model AdminAuditLog {
+  id        String @id @default(cuid())
+  actorId   String?
+  action    String
+  targetId  String
+  details   Json?
+  createdAt DateTime @default(now())
+  actor     User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("admin_audit_logs")
 }
 
 model PlaceInteraction {

@@ -11,7 +11,10 @@ export type QuivibePlace = {
   imageAlt: string;
   reservationsEnabled: boolean;
   amenities: string[];
+  maxPartySize?: number;
+  latitude?: number;
+  longitude?: number;
   availableSlot?: string | null;
 };
 
-export type QuivibeRecommendation = QuivibePlace & { reason: string };
+export type QuivibeRecommendation = QuivibePlace & { reason: string; partialMatch?: boolean };

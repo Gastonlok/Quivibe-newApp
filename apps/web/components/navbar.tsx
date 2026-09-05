@@ -10,6 +10,7 @@ import {
   LogOut,
   MapPin,
   Menu,
+  Mail,
   Search,
   Sparkles,
   Shield,
@@ -29,18 +30,24 @@ export function Navbar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
-  const authenticated = status === "authenticated";
+  const authenticated =
+    status === "authenticated" && Boolean(session?.user?.id);
   const role = session?.user?.role;
 
   const accountLinks = authenticated
     ? [
-        { href: "/reservations", label: "Mes réservations", icon: CalendarCheck2 },
+        {
+          href: "/reservations",
+          label: "Mes réservations",
+          icon: CalendarCheck2,
+        },
         { href: "/favorites", label: "Favoris", icon: Heart },
+        { href: "/messages", label: "Messages", icon: Mail },
       ]
     : [];
 
   const dashboard =
-    role === "ADMIN"
+    role === "ADMIN" || Boolean(session?.user?.moderationPermissions?.length)
       ? { href: "/admin/dashboard", label: "Administration", icon: Shield }
       : role === "OWNER"
         ? { href: "/owner/dashboard", label: "Espace pro", icon: Store }
@@ -51,7 +58,11 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur">
       <div className="container flex h-18 items-center justify-between py-3">
-        <Link href="/" className="relative h-12 w-40 overflow-hidden rounded-lg" onClick={() => setOpen(false)}>
+        <Link
+          href="/"
+          className="relative h-12 w-40 overflow-hidden rounded-lg"
+          onClick={() => setOpen(false)}
+        >
           <Image
             src="/brand/quivibe-logo.png"
             alt="Quivibe - Ne cherche plus, vibe ou tu veux"
@@ -62,7 +73,10 @@ export function Navbar() {
           />
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Navigation principale">
+        <nav
+          className="hidden items-center gap-1 lg:flex"
+          aria-label="Navigation principale"
+        >
           {links.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (

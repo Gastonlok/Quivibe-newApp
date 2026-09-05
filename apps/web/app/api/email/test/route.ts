@@ -1,37 +1,20 @@
-// apps/web/app/api/email/test/route.ts
-import { NextResponse } from "next/server";
-import { sendWelcomeEmail, sendOwnerRequestStatusEmail } from "@/lib/email";
-
-export async function GET() {
-  try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-    // Tester l'email de bienvenue
-    await sendWelcomeEmail(
-      "test@example.com",
-      "Utilisateur Test",
-      appUrl
-    );
-
-    // Tester l'email de statut propriétaire
-    await sendOwnerRequestStatusEmail(
-      "test@example.com",
-      "Utilisateur Test",
-      "Mon Restaurant",
-      "APPROVED",
-      "Félicitations ! Votre demande a été acceptée.",
-      appUrl
-    );
-
-    return NextResponse.json({
-      message: "Emails de test envoyés avec succès !",
-      note: "Vérifiez votre boîte mail (ou la console pour les logs)"
-    });
-  } catch (error) {
-    console.error("Erreur:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de l'envoi des emails" },
-      { status: 500 }
-    );
-  }
+﻿import { NextResponse } from "next/server";
+import { getAdminActor } from "@/features/admin/access";
+import { auth } from "@/lib/auth";
+import { sendTestEmail } from "@/lib/email";
+export async function POST() {
+  if (!(await getAdminActor("MESSAGES")))
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  const session = await auth();
+  if (!session?.user?.email)
+    return NextResponse.json({ error: "Connexion requise" }, { status: 401 });
+  const result = await sendTestEmail(session.user.email);
+  return result.success
+    ? NextResponse.json({
+        message: "E-mail de test accepté par le prestataire.",
+      })
+    : NextResponse.json(
+        { error: "E-mail non envoyé. Vérifiez la configuration Resend." },
+        { status: 503 },
+      );
 }

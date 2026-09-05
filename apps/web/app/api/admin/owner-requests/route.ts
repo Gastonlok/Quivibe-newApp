@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAdminActor } from "@/features/admin/access";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  const actor = await getAdminActor("OWNER_REQUESTS");
+  if (!actor) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
   try {
@@ -18,6 +18,9 @@ export async function GET() {
     return NextResponse.json({ requests });
   } catch (error) {
     console.error("Erreur de lecture des demandes propriétaires:", error);
-    return NextResponse.json({ error: "Impossible de charger les demandes" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Impossible de charger les demandes" },
+      { status: 500 },
+    );
   }
 }

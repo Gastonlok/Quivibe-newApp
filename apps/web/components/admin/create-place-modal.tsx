@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Loader2, Building2, MapPin, Phone, DollarSign, Search, User } from "lucide-react";
+import {
+  X,
+  Loader2,
+  Building2,
+  MapPin,
+  Phone,
+  DollarSign,
+  Search,
+  User,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ============================================
@@ -37,7 +46,11 @@ interface User {
   role: string;
 }
 
-export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModalProps) {
+export function CreatePlaceModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: CreatePlaceModalProps) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -62,10 +75,16 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
 
   // Charger les utilisateurs
   useEffect(() => {
-    if (isOpen) {
-      fetchUsers();
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    const controller = new AbortController();
+    setLoading(true);
+    fetch(`/api/admin/users?q=${encodeURIComponent(debouncedSearch)}`, { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data) => setUsers((data.users || []).filter((user: User) => ["OWNER", "ADMIN"].includes(user.role))))
+      .catch((error) => { if (!controller.signal.aborted) console.error("Erreur:", error); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [isOpen, debouncedSearch]);
 
   // ✅ Filtrer les utilisateurs avec le debouncedSearch
   const filteredUsers = users.filter((user) => {
@@ -75,19 +94,6 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
       user.email.toLowerCase().includes(query)
     );
   });
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/users");
-      const data = await res.json();
-      setUsers(data.users || []);
-    } catch (error) {
-      console.error("Erreur:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSelectUser = (user: User) => {
     setSelectedUser(user);
@@ -174,7 +180,9 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
             <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
               <div className="flex items-center gap-3">
                 <Building2 className="w-6 h-6 text-primary-500" />
-                <h2 className="text-xl font-bold text-gray-900">Créer un établissement</h2>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Créer un établissement
+                </h2>
               </div>
               <button
                 onClick={onClose}
@@ -203,7 +211,9 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                       placeholder="Le Jardin des Saveurs"
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                     />
                   </div>
 
@@ -217,7 +227,12 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                       placeholder="Décrivez l'établissement..."
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          description: e.target.value,
+                        })
+                      }
                     />
                   </div>
 
@@ -232,7 +247,9 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                       placeholder="12 Avenue de la Gombe"
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, address: e.target.value })
+                      }
                     />
                   </div>
 
@@ -246,11 +263,18 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                         required
                         className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         value={formData.neighborhood}
-                        onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            neighborhood: e.target.value,
+                          })
+                        }
                       >
                         <option value="">Sélectionner</option>
                         {neighborhoods.map((hood) => (
-                          <option key={hood} value={hood}>{hood}</option>
+                          <option key={hood} value={hood}>
+                            {hood}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -261,7 +285,12 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                       <select
                         className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         value={formData.priceRange}
-                        onChange={(e) => setFormData({ ...formData, priceRange: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            priceRange: e.target.value,
+                          })
+                        }
                       >
                         <option value="1">€ (Bon marché)</option>
                         <option value="2">€€ (Moyen)</option>
@@ -283,7 +312,9 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                         placeholder="-4.325"
                         className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         value={formData.latitude}
-                        onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, latitude: e.target.value })
+                        }
                       />
                     </div>
                     <div>
@@ -296,7 +327,12 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                         placeholder="15.325"
                         className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         value={formData.longitude}
-                        onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            longitude: e.target.value,
+                          })
+                        }
                       />
                     </div>
                   </div>
@@ -311,7 +347,9 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                       placeholder="+243 812 345 678"
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
                     />
                   </div>
 
@@ -375,11 +413,15 @@ export function CreatePlaceModal({ isOpen, onClose, onSuccess }: CreatePlaceModa
                                     {user.email}
                                   </p>
                                 </div>
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  user.role === "ADMIN" ? "bg-purple-100 text-purple-700" :
-                                  user.role === "OWNER" ? "bg-blue-100 text-blue-700" :
-                                  "bg-gray-100 text-gray-700"
-                                }`}>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    user.role === "ADMIN"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : user.role === "OWNER"
+                                        ? "bg-blue-100 text-blue-700"
+                                        : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
                                   {user.role}
                                 </span>
                               </button>

@@ -17,15 +17,19 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", path);
       return NextResponse.redirect(loginUrl);
     }
-    if (token.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
+    // Fine-grained permissions are checked from the database in the server layout/API.
   }
 
-  const publicOwnerRoutes = ["/owner/login", "/owner/register", "/owner/pricing"];
+  const publicOwnerRoutes = [
+    "/owner/login",
+    "/owner/register",
+    "/owner/pricing",
+  ];
   const isPrivateOwnerRoute =
     path.startsWith("/owner") &&
-    !publicOwnerRoutes.some((route) => path === route || path.startsWith(`${route}/`));
+    !publicOwnerRoutes.some(
+      (route) => path === route || path.startsWith(`${route}/`),
+    );
 
   if (isPrivateOwnerRoute) {
     if (!token) {
@@ -33,12 +37,14 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", path);
       return NextResponse.redirect(loginUrl);
     }
-    if (token.role !== "OWNER" && token.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
+    // Owner pages and actions validate current ownership/role on the server.
   }
 
-  if (["/favorites", "/profile", "/reservations"].some((route) => path.startsWith(route))) {
+  if (
+    ["/favorites", "/profile", "/reservations", "/messages"].some((route) =>
+      path.startsWith(route),
+    )
+  ) {
     if (!token) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("callbackUrl", path);
@@ -56,5 +62,6 @@ export const config = {
     "/favorites/:path*",
     "/profile/:path*",
     "/reservations/:path*",
+    "/messages/:path*",
   ],
 };

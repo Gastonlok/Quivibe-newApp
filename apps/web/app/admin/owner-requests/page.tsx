@@ -1,10 +1,19 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
+import { canAdmin } from "@/features/admin/permissions";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle, XCircle, Clock, User, Store, MapPin, Eye } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Clock,
+  User,
+  Store,
+  MapPin,
+  Eye,
+} from "lucide-react";
 
 interface OwnerRequest {
   id: string;
@@ -23,12 +32,14 @@ export default function AdminOwnerRequestsPage() {
   const router = useRouter();
   const [requests, setRequests] = useState<OwnerRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<OwnerRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<OwnerRequest | null>(
+    null,
+  );
   const [adminNote, setAdminNote] = useState("");
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session || session.user?.role !== "ADMIN") {
+    if (!session || !canAdmin(session.user, "OWNER_REQUESTS")) {
       router.push("/");
       return;
     }
@@ -47,7 +58,10 @@ export default function AdminOwnerRequestsPage() {
     }
   };
 
-  const handleAction = async (requestId: string, action: "APPROVED" | "REJECTED") => {
+  const handleAction = async (
+    requestId: string,
+    action: "APPROVED" | "REJECTED",
+  ) => {
     try {
       const res = await fetch(`/api/admin/owner-requests/${requestId}`, {
         method: "PATCH",
@@ -90,14 +104,17 @@ export default function AdminOwnerRequestsPage() {
     );
   }
 
-  const pendingCount = requests.filter(r => r.status === "PENDING").length;
+  const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Demandes propriétaires</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Demandes propriétaires
+        </h1>
         <p className="text-gray-500 mt-1">
-          {pendingCount} demande{pendingCount > 1 ? "s" : ""} en attente de validation
+          {pendingCount} demande{pendingCount > 1 ? "s" : ""} en attente de
+          validation
         </p>
       </div>
 
@@ -126,7 +143,10 @@ export default function AdminOwnerRequestsPage() {
             <tbody className="divide-y divide-gray-100">
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={5}
+                    className="px-6 py-12 text-center text-gray-500"
+                  >
                     Aucune demande pour le moment
                   </td>
                 </tr>
@@ -134,13 +154,20 @@ export default function AdminOwnerRequestsPage() {
                 requests.map((req) => {
                   const { style, label } = getStatusBadge(req.status);
                   return (
-                    <tr key={req.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={req.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-gray-400" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{req.user.name}</p>
-                            <p className="text-xs text-gray-500">{req.user.email}</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {req.user.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {req.user.email}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -148,7 +175,9 @@ export default function AdminOwnerRequestsPage() {
                         <div className="flex items-center gap-2">
                           <Store className="w-4 h-4 text-gray-400" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{req.placeName}</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {req.placeName}
+                            </p>
                             <div className="flex items-center gap-1 text-xs text-gray-500">
                               <MapPin className="w-3 h-3" />
                               {req.placeAddress}
@@ -157,7 +186,9 @@ export default function AdminOwnerRequestsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}
+                        >
                           {label}
                         </span>
                       </td>
@@ -197,13 +228,17 @@ export default function AdminOwnerRequestsPage() {
               <div>
                 <p className="text-sm text-gray-500">Demandeur</p>
                 <p className="font-medium">{selectedRequest.user.name}</p>
-                <p className="text-sm text-gray-500">{selectedRequest.user.email}</p>
+                <p className="text-sm text-gray-500">
+                  {selectedRequest.user.email}
+                </p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-500">Établissement</p>
                 <p className="font-medium">{selectedRequest.placeName}</p>
-                <p className="text-sm text-gray-500">{selectedRequest.placeAddress}</p>
+                <p className="text-sm text-gray-500">
+                  {selectedRequest.placeAddress}
+                </p>
               </div>
 
               {selectedRequest.description && (

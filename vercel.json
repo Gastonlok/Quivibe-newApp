@@ -1,9 +1,0 @@
-{
-  "buildCommand": "pnpm --filter web exec prisma migrate deploy && pnpm --filter web build",
-  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
-  "framework": "nextjs",
-  "outputDirectory": ".next",
-  "crons": [
-    { "path": "/api/cron/reservation-reminders", "schedule": "0 7 * * *" }
-  ]
-}

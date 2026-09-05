@@ -1,44 +1,37 @@
-// apps/web/app/api/admin/users/route.ts
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-
-export async function GET() {
-  try {
-    const session = await auth();
-    if (!session || session.user?.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Non autorisé" },
-        { status: 401 }
-      );
-    }
-
-    const users = await prisma.user.findMany({
+import { getAdminActor } from "@/features/admin/access";
+export async function GET(request: Request) {
+  if (!(await getAdminActor("USERS")))
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  const params = new URL(request.url).searchParams;
+  const q = (params.get("q") || "").slice(0, 120);
+  const page = Math.max(1, Math.min(100000, Number(params.get("page")) || 1));
+  const where = q
+    ? {
+        OR: [
+          { name: { contains: q, mode: "insensitive" as const } },
+          { email: { contains: q, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      skip: (Math.floor(page) - 1) * 50,
+      take: 50,
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        ownerStatus: true,
+        suspendedAt: true,
+        moderationPermissions: true,
         createdAt: true,
-        _count: {
-          select: {
-            places: true,
-            reviews: true,
-          },
-        },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    return NextResponse.json({ users });
-  } catch (error) {
-    console.error("Erreur:", error);
-    return NextResponse.json(
-      { error: "Une erreur est survenue" },
-      { status: 500 }
-    );
-  }
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    }),
+    prisma.user.count({ where }),
+  ]);
+  return NextResponse.json({ users, total });
 }

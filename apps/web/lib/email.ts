@@ -23,6 +23,7 @@ async function sendEmail(input: {
   to: string;
   subject: string;
   html: string;
+  idempotencyKey?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return emailDisabledResult();
@@ -33,6 +34,9 @@ async function sendEmail(input: {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        ...(input.idempotencyKey
+          ? { "Idempotency-Key": input.idempotencyKey }
+          : {}),
       },
       body: JSON.stringify({
         from: fromEmail,
@@ -41,6 +45,7 @@ async function sendEmail(input: {
         html: input.html,
       }),
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
     });
 
     const data = (await response.json().catch(() => null)) as unknown;
@@ -58,7 +63,11 @@ async function sendEmail(input: {
   }
 }
 
-function emailLayout(title: string, body: string, action?: { label: string; url: string }) {
+function emailLayout(
+  title: string,
+  body: string,
+  action?: { label: string; url: string },
+) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const logoUrl = `${appUrl.replace(/\/$/, "")}/brand/quivibe-logo.png`;
   const button = action
@@ -66,6 +75,27 @@ function emailLayout(title: string, body: string, action?: { label: string; url:
     : "";
 
   return `<!doctype html><html lang="fr"><body style="margin:0;background:#fff4e8;font-family:Arial,sans-serif;color:#171717"><div style="max-width:620px;margin:0 auto;padding:32px 16px"><div style="overflow:hidden;background:#ffffff;border:1px solid #f9d2a5;border-radius:24px"><div style="padding:24px 32px;background:#f99216;text-align:center"><img src="${escapeHtml(logoUrl)}" alt="Quivibe" width="220" style="display:block;width:220px;max-width:100%;height:auto;margin:0 auto" /></div><div style="padding:32px"><p style="margin:0 0 14px;color:#b95000;font-size:12px;font-weight:800;letter-spacing:1.6px">QUIVIBE</p><h1 style="margin:0 0 18px;font-size:26px;line-height:1.25;color:#171717">${escapeHtml(title)}</h1>${body}${button}<p style="margin:28px 0 0;padding-top:18px;border-top:1px solid #fde3c4;color:#766b61;font-size:13px">Notification automatique Quivibe. Ne cherchez plus, vibe où tu veux.</p></div></div></div></body></html>`;
+}
+
+export function sendAdminMessageEmail(input: {
+  to: string;
+  subject: string;
+  body: string;
+  idempotencyKey: string;
+}) {
+  return sendEmail({
+    to: input.to,
+    subject: input.subject,
+    idempotencyKey: input.idempotencyKey,
+    html: emailLayout(
+      input.subject,
+      `<p style="white-space:pre-wrap;line-height:1.7">${escapeHtml(input.body)}</p>`,
+      {
+        label: "Mes messages Quivibe",
+        url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/messages`,
+      },
+    ),
+  });
 }
 
 export function sendWelcomeEmail(email: string, name: string, appUrl: string) {
@@ -102,7 +132,12 @@ export function sendOwnerRequestStatusEmail(
     html: emailLayout(
       approved ? "Demande approuvée" : "Demande non approuvée",
       `<p style="line-height:1.7">Bonjour ${escapeHtml(name)}, la demande concernant <strong>${escapeHtml(placeName)}</strong> a été ${approved ? "approuvée" : "refusée"}.</p>${note}`,
-      approved ? { label: "Ouvrir l’espace propriétaire", url: `${appUrl}/owner/dashboard` } : undefined,
+      approved
+        ? {
+            label: "Ouvrir l’espace propriétaire",
+            url: `${appUrl}/owner/dashboard`,
+          }
+        : undefined,
     ),
   });
 }
@@ -114,7 +149,10 @@ export function sendFavoriteReminderEmail(
   appUrl: string,
 ) {
   if (favoritePlaces.length === 0) {
-    return Promise.resolve({ success: false as const, error: "Aucun favori à rappeler" });
+    return Promise.resolve({
+      success: false as const,
+      error: "Aucun favori à rappeler",
+    });
   }
 
   const items = favoritePlaces
@@ -146,7 +184,11 @@ export function sendTestEmail(email: string) {
   });
 }
 
-export function sendEmailVerificationEmail(email: string, name: string, url: string) {
+export function sendEmailVerificationEmail(
+  email: string,
+  name: string,
+  url: string,
+) {
   return sendEmail({
     to: email,
     subject: "Confirmez votre adresse email Quivibe",
@@ -158,7 +200,11 @@ export function sendEmailVerificationEmail(email: string, name: string, url: str
   });
 }
 
-export function sendPasswordResetEmail(email: string, name: string, url: string) {
+export function sendPasswordResetEmail(
+  email: string,
+  name: string,
+  url: string,
+) {
   return sendEmail({
     to: email,
     subject: "Reinitialisez votre mot de passe Quivibe",
@@ -188,7 +234,9 @@ export function sendReservationEmail(input: {
 
   return sendEmail({
     to: input.email,
-    subject: cancelled ? "Votre reservation Quivibe est annulee" : "Votre reservation Quivibe est confirmee",
+    subject: cancelled
+      ? "Votre reservation Quivibe est annulee"
+      : "Votre reservation Quivibe est confirmee",
     html: emailLayout(
       cancelled ? "Reservation annulee" : "Reservation enregistree",
       `<p style="line-height:1.7">Bonjour ${escapeHtml(input.name)}, votre reservation chez <strong>${escapeHtml(input.placeName)}</strong> ${cancelled ? "a ete annulee" : "est enregistree"}.</p><p style="line-height:1.7"><strong>Date :</strong> ${escapeHtml(date)}<br/><strong>Reference :</strong> ${escapeHtml(input.reference)}</p>`,
@@ -196,7 +244,6 @@ export function sendReservationEmail(input: {
     ),
   });
 }
-
 
 export function sendReservationReminderEmail(input: {
   email: string;
@@ -222,7 +269,12 @@ export function sendReservationReminderEmail(input: {
   });
 }
 
-export function sendWaitlistAvailabilityEmail(email: string, name: string, placeName: string, placeSlug: string) {
+export function sendWaitlistAvailabilityEmail(
+  email: string,
+  name: string,
+  placeName: string,
+  placeSlug: string,
+) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   return sendEmail({
     to: email,
@@ -230,7 +282,10 @@ export function sendWaitlistAvailabilityEmail(email: string, name: string, place
     html: emailLayout(
       "Une disponibilite vient de se liberer",
       `<p style="line-height:1.7">Bonjour ${escapeHtml(name)}, une table peut etre disponible chez <strong>${escapeHtml(placeName)}</strong>. Reprenez votre reservation rapidement pour consulter les creneaux proposes.</p>`,
-      { label: "Voir les disponibilites", url: `${appUrl}/places/${placeSlug}` },
+      {
+        label: "Voir les disponibilites",
+        url: `${appUrl}/places/${placeSlug}`,
+      },
     ),
   });
 }

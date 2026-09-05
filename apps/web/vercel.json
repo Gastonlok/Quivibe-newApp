@@ -1,0 +1,10 @@
+{
+  "buildCommand": "pnpm exec prisma migrate deploy && pnpm build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "crons": [
+    { "path": "/api/cron/reservation-reminders", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/admin-messages", "schedule": "0 8 * * *" }
+  ]
+}

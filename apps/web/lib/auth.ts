@@ -18,6 +18,7 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: string;
+      moderationPermissions?: string[];
       image?: string | null;
     };
   }
@@ -31,7 +32,12 @@ class AuthServiceUnavailableError extends CredentialsSignin {
   code = "auth-service-unavailable";
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const {
+  handlers,
+  signIn,
+  signOut,
+  auth: sessionAuth,
+} = NextAuth({
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 jours
@@ -61,10 +67,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           // Recherche de l'utilisateur
           const user = await prisma.user.findUnique({
-            where: { email }
+            where: { email },
           });
 
-          if (!user || !user.passwordHash) {
+          if (!user || !user.passwordHash || user.suspendedAt) {
             return null;
           }
 
@@ -73,7 +79,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           // Vérification du mot de passe
-          const passwordValid = await bcrypt.compare(password, user.passwordHash);
+          const passwordValid = await bcrypt.compare(
+            password,
+            user.passwordHash,
+          );
           if (!passwordValid) {
             return null;
           }
@@ -108,15 +117,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         const currentUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { id: true, name: true, email: true, role: true, image: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            image: true,
+            suspendedAt: true,
+            moderationPermissions: true,
+          },
         });
 
-        if (currentUser) {
+        if (currentUser && !currentUser.suspendedAt) {
           session.user.id = currentUser.id;
           session.user.name = currentUser.name;
           session.user.email = currentUser.email;
           session.user.role = currentUser.role;
           session.user.image = currentUser.image;
+          session.user.moderationPermissions =
+            currentUser.moderationPermissions;
+        } else {
+          session.user.id = "";
+          session.user.role = "DISABLED";
+          session.user.moderationPermissions = [];
         }
       }
       return session;
@@ -126,3 +149,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   debug: process.env.NODE_ENV === "development",
 });
+
+// Deleted or suspended accounts lose access on their next server request.
+export async function auth() {
+  const session = await sessionAuth();
+  return session?.user?.id && session.user.role !== "DISABLED" ? session : null;
+}

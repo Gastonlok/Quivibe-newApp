@@ -1,89 +1,78 @@
+﻿import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-
+import { getAdminActor } from "@/features/admin/access";
+import { slugify } from "@/utils/slugify";
+const schema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    description: z.string().trim().max(2000).default(""),
+    address: z.string().trim().min(3).max(200),
+    neighborhood: z.string().trim().min(2).max(100),
+    latitude: z.coerce.number().min(-90).max(90),
+    longitude: z.coerce.number().min(-180).max(180),
+    priceRange: z.coerce.number().int().min(1).max(4),
+    phone: z.string().trim().max(30).optional(),
+    ownerId: z.string().max(100).optional(),
+    status: z.enum(["PENDING", "APPROVED", "REJECTED"]).default("APPROVED"),
+  })
+  .strict();
 export async function POST(request: Request) {
-  try {
-    const session = await auth();
-    if (!session || session.user?.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Non autorisé" },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-    const {
-      name,
-      description,
-      address,
-      neighborhood,
-      latitude,
-      longitude,
-      priceRange,
-      phone,
-      ownerId,
-      status = "APPROVED",
-    } = body;
-
-    // Validation
-    if (!name || !address || !neighborhood) {
-      return NextResponse.json(
-        { error: "Le nom, l'adresse et le quartier sont requis" },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Utiliser let au lieu de const
-    let slug = name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-    // Vérifier si le slug existe déjà
-    const existingPlace = await prisma.place.findUnique({
-      where: { slug },
-    });
-
-    if (existingPlace) {
-      // Si le slug existe, ajouter un timestamp
-      const timestamp = Date.now().toString().slice(-6);
-      slug = `${slug}-${timestamp}`; // ✅ Maintenant possible avec let
-    }
-
-    // Déterminer le propriétaire
-    let ownerIdToUse = ownerId;
-    if (!ownerIdToUse) {
-      const adminUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
-      });
-      ownerIdToUse = adminUser?.id || session.user.id;
-    }
-
-    const place = await prisma.place.create({
-      data: {
-        name,
-        slug,
-        description: description || "",
-        address,
-        neighborhood,
-        latitude: parseFloat(latitude) || 0,
-        longitude: parseFloat(longitude) || 0,
-        priceRange: parseInt(priceRange) || 2,
-        phone: phone || null,
-        status,
-        ownerId: ownerIdToUse,
-      },
-    });
-
-    return NextResponse.json({ place }, { status: 201 });
-  } catch (error) {
-    console.error("Erreur:", error);
+  const actor = await getAdminActor("USERS");
+  if (!actor)
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  const parsed = schema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success || !slugify(parsed.data.name))
     return NextResponse.json(
-      { error: "Une erreur est survenue" },
-      { status: 500 }
+      { error: "Vérifiez les informations de l’établissement." },
+      { status: 400 },
+    );
+  try {
+    const place = await prisma.$transaction(async (tx) => {
+      const ownerId = parsed.data.ownerId || actor.id;
+      const owner = await tx.user.findFirst({
+        where: {
+          id: ownerId,
+          suspendedAt: null,
+          role: { in: ["OWNER", "ADMIN"] },
+        },
+        select: { id: true },
+      });
+      if (!owner) throw new Error("Invalid owner");
+      const base = slugify(parsed.data.name);
+      const slug = (await tx.place.findUnique({
+        where: { slug: base },
+        select: { id: true },
+      }))
+        ? `${base}-${randomUUID().slice(0, 8)}`
+        : base;
+      const result = await tx.place.create({
+        data: {
+          ...parsed.data,
+          slug,
+          ownerId,
+          phone: parsed.data.phone || null,
+        },
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: actor.id,
+          action: "PLACE_CREATED",
+          targetId: result.id,
+          details: { name: result.name, ownerId },
+        },
+      });
+      return result;
+    });
+    return NextResponse.json({ place }, { status: 201 });
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          "Création impossible. Choisissez un compte propriétaire ou administrateur actif.",
+      },
+      { status: 409 },
     );
   }
 }

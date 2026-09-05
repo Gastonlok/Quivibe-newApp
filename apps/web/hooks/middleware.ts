@@ -1,5 +1,5 @@
 // apps/web/middleware.ts
-import { auth } from "@/lib/auth";
+import { sessionAuth as auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 // ============================================
@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 // Routes accessibles uniquement aux admins
 // ⚠️ Avec (admin)/dashboard → URL réelle = /dashboard
 const ADMIN_ONLY_PATHS = [
-  "/dashboard",      // Page admin !!!
+  "/dashboard", // Page admin !!!
   "/dashboard/places",
   "/dashboard/reviews",
   "/dashboard/users",
@@ -23,18 +23,14 @@ const OWNER_ONLY_PATHS = [
 ];
 
 // Routes accessibles uniquement aux utilisateurs connectés
-const USER_ONLY_PATHS = [
-  "/favorites",
-  "/profile",
-  "/reviews/new",
-];
+const USER_ONLY_PATHS = ["/favorites", "/profile", "/reviews/new"];
 
 // ============================================
 // MIDDLEWARE
 // ============================================
 
 export default auth((req) => {
-  const isLoggedIn = !!req.auth;
+  const isLoggedIn = Boolean(req.auth?.user?.id);
   const pathname = req.nextUrl.pathname;
 
   console.log("🔐 Path:", pathname);
@@ -106,7 +102,7 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/owner/:path*",
-    "/favorites",      // ✅ Ajouter cette ligne
+    "/favorites", // ✅ Ajouter cette ligne
     "/favorites/:path*", // ✅ Pour les sous-routes
     "/profile",
   ],

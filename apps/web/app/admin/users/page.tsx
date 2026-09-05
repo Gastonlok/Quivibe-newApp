@@ -1,212 +1,248 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { Users, Search, Loader2, Mail, Building2, UserX, ArrowLeft } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+﻿"use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import {
+  MODERATION_PERMISSIONS,
+  permissionLabels,
+} from "@/features/admin/permissions";
+import { adminRequest } from "@/features/admin/client";
 
-interface User {
+type Account = {
   id: string;
   name: string;
   email: string;
   role: string;
-  ownerStatus: string | null;
-  createdAt: string;
-  _count: {
-    places: number;
-    reviews: number;
-  };
-}
-
+  suspendedAt: string | null;
+  moderationPermissions: string[];
+};
 export default function AdminUsersPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
+  const { data: session } = useSession();
+  const [users, setUsers] = useState<Account[]>([]);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [version, setVersion] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState("all");
-
+  const [feedback, setFeedback] = useState("");
   useEffect(() => {
-    if (status === "loading") return;
-    if (!session || session.user?.role !== "ADMIN") {
-      router.push("/");
-      return;
-    }
-    fetchUsers();
-  }, [session, status, router]);
-
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch("/api/admin/users");
-      const data = await res.json();
-      setUsers(data.users || []);
-    } catch (error) {
-      console.error("Erreur:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
-      });
-
-      if (res.ok) {
-        await fetchUsers();
-      }
-    } catch (error) {
-      console.error("Erreur:", error);
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) return;
-
-    try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        await fetchUsers();
-      }
-    } catch (error) {
-      console.error("Erreur:", error);
-    }
-  };
-
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) ||
-                          user.email.toLowerCase().includes(search.toLowerCase());
-    const matchesRole = filterRole === "all" || user.role === filterRole;
-    return matchesSearch && matchesRole;
-  });
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-      </div>
+    let active = true;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      void adminRequest(
+        `/api/admin/users?q=${encodeURIComponent(query)}&page=${page}`,
+      )
+        .then((data) => {
+          if (active) {
+            setUsers(data.users);
+            setTotal(data.total);
+          }
+        })
+        .catch((e) => {
+          if (active) setFeedback(e.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, page, version]);
+  function edit(id: string, patch: Partial<Account>) {
+    setUsers((all) =>
+      all.map((user) => (user.id === id ? { ...user, ...patch } : user)),
     );
   }
-
+  async function save(user: Account, remove = false) {
+    if (
+      remove &&
+      !confirm(`Supprimer définitivement le compte de ${user.name} ?`)
+    )
+      return;
+    setBusy(true);
+    setFeedback("");
+    try {
+      await adminRequest(
+        `/api/admin/users/${user.id}`,
+        remove ? "DELETE" : "PATCH",
+        remove
+          ? undefined
+          : {
+              role: user.role,
+              suspended: Boolean(user.suspendedAt),
+              moderationPermissions: user.moderationPermissions,
+            },
+      );
+      setFeedback(
+        remove ? "Compte supprimé." : "Compte et permissions enregistrés.",
+      );
+      setVersion((n) => n + 1);
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : "Opération impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-          <Users className="w-8 h-8 text-primary-500" />
-          Utilisateurs
-        </h1>
-        <p className="text-gray-500 mt-1">{users.length} utilisateurs inscrits</p>
-      </div>
-
-      <div className="flex flex-wrap gap-4 mb-6">
-        <div className="flex-1 min-w-[200px] relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Rechercher un utilisateur..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
+    <main>
+      <h1 className="text-3xl font-extrabold">Comptes et collaborateurs</h1>
+      <p className="mt-2 text-gray-600">
+        {total} comptes. Confiez des tâches précises sans donner le rôle
+        administrateur.
+      </p>
+      <label className="mt-6 block">
+        <span className="text-sm font-bold">Rechercher par nom ou e-mail</span>
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(1);
+          }}
+          className="mt-2 w-full rounded-xl border p-3"
+        />
+      </label>
+      {feedback && (
+        <p role="status" className="my-4 rounded-xl border bg-white p-3">
+          {feedback}
+        </p>
+      )}
+      {loading ? (
+        <p className="mt-6" role="status">
+          Chargement…
+        </p>
+      ) : (
+        <div className="mt-6 space-y-4">
+          {users.map((user) => {
+            const self = session?.user?.id === user.id;
+            return (
+              <article
+                key={user.id}
+                className="rounded-2xl border bg-white p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-bold">
+                      {user.name}
+                      {self ? " (vous)" : ""}
+                    </h2>
+                    <p className="text-sm text-gray-500">{user.email}</p>
+                  </div>
+                  <Link
+                    href={`/admin/messages?userId=${encodeURIComponent(user.id)}`}
+                    className="font-bold text-primary-700"
+                  >
+                    Envoyer un message
+                  </Link>
+                </div>
+                <fieldset disabled={busy} className="mt-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label>
+                      Rôle{" "}
+                      <select
+                        aria-label={`Rôle de ${user.name}`}
+                        disabled={self}
+                        value={user.role}
+                        onChange={(e) =>
+                          edit(user.id, {
+                            role: e.target.value,
+                            moderationPermissions: [],
+                          })
+                        }
+                        className="ml-2 rounded-lg border p-2"
+                      >
+                        <option value="USER">Utilisateur</option>
+                        <option value="OWNER">Propriétaire</option>
+                        <option value="ADMIN">Administrateur</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        disabled={self}
+                        checked={Boolean(user.suspendedAt)}
+                        onChange={(e) =>
+                          edit(user.id, {
+                            suspendedAt: e.target.checked
+                              ? new Date().toISOString()
+                              : null,
+                          })
+                        }
+                      />
+                      Compte suspendu
+                    </label>
+                  </div>
+                  {user.role !== "ADMIN" ? (
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      {MODERATION_PERMISSIONS.map((permission) => (
+                        <label
+                          key={permission}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={user.moderationPermissions.includes(
+                              permission,
+                            )}
+                            onChange={(e) =>
+                              edit(user.id, {
+                                moderationPermissions: e.target.checked
+                                  ? [...user.moderationPermissions, permission]
+                                  : user.moderationPermissions.filter(
+                                      (p) => p !== permission,
+                                    ),
+                              })
+                            }
+                          />
+                          {permissionLabels[permission]}
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-primary-700">
+                      Accès complet à l’administration.
+                    </p>
+                  )}
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      onClick={() => void save(user)}
+                      className="rounded-xl bg-primary-600 px-4 py-2 font-bold text-white"
+                    >
+                      Enregistrer
+                    </button>
+                    {!self && (
+                      <button
+                        onClick={() => void save(user, true)}
+                        className="rounded-xl border border-red-200 px-4 py-2 text-red-700"
+                      >
+                        Supprimer le compte
+                      </button>
+                    )}
+                  </div>
+                </fieldset>
+              </article>
+            );
+          })}
+          {!users.length && <p>Aucun compte trouvé.</p>}
         </div>
-        <select
-          value={filterRole}
-          onChange={(e) => setFilterRole(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      )}
+      <div className="mt-6 flex justify-between">
+        <button
+          disabled={page <= 1 || loading || busy}
+          onClick={() => setPage(page - 1)}
         >
-          <option value="all">Tous les rôles</option>
-          <option value="USER">Utilisateurs</option>
-          <option value="OWNER">Propriétaires</option>
-          <option value="ADMIN">Admins</option>
-        </select>
+          Précédent
+        </button>
+        <span>Page {page}</span>
+        <button
+          disabled={page * 50 >= total || loading || busy}
+          onClick={() => setPage(page + 1)}
+        >
+          Suivant
+        </button>
       </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utilisateur</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rôle</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activité</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Aucun utilisateur trouvé</td>
-                </tr>
-              ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                          <span className="text-primary-600 font-semibold text-sm">{user.name.charAt(0).toUpperCase()}</span>
-                        </div>
-                        <span className="font-medium text-gray-900">{user.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        user.role === "ADMIN" ? "bg-purple-100 text-purple-700" :
-                        user.role === "OWNER" ? "bg-blue-100 text-blue-700" :
-                        "bg-gray-100 text-gray-700"
-                      }`}>{user.role}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {user.role === "OWNER" && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          user.ownerStatus === "APPROVED" ? "bg-green-100 text-green-700" :
-                          user.ownerStatus === "PENDING" ? "bg-yellow-100 text-yellow-700" :
-                          "bg-red-100 text-red-700"
-                        }`}>{user.ownerStatus || "Non vérifié"}</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" />{user._count.places}</span>
-                        <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{user._count.reviews}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {user.role !== "ADMIN" && (
-                          <select
-                            value={user.role}
-                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                            className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary-500"
-                          >
-                            <option value="USER">USER</option>
-                            <option value="OWNER">OWNER</option>
-                            <option value="ADMIN">ADMIN</option>
-                          </select>
-                        )}
-                        {user.role !== "ADMIN" && (
-                          <button onClick={() => handleDeleteUser(user.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                            <UserX className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }

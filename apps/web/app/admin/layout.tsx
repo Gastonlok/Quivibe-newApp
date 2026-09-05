@@ -1,111 +1,97 @@
-"use client";
+﻿import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getAdminActor } from "@/features/admin/access";
+import { canAdmin, type AdminPermission } from "@/features/admin/permissions";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
-import {
-  Shield, Users, Store, Star, LogOut, BarChart3,
-  Bell, AlertTriangle
-} from "lucide-react";
-import Link from "next/link";
-import { signOut } from "next-auth/react";
-
-export default function AdminLayout({
+export const dynamic = "force-dynamic";
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const [activeTab, setActiveTab] = useState(() => {
-    if (pathname.includes("/admin/users")) return "users";
-    if (pathname.includes("/admin/places")) return "places";
-    if (pathname.includes("/admin/reviews")) return "reviews";
-    if (pathname.includes("/admin/owner-requests")) return "owner-requests";
-    return "overview";
-  });
-
+  const actor = await getAdminActor();
+  if (!actor) redirect("/");
+  const links: { href: string; label: string; permission?: AdminPermission }[] =
+    [
+      { href: "/admin/dashboard", label: "Vue d’ensemble" },
+      {
+        href: "/admin/users",
+        label: "Comptes et collaborateurs",
+        permission: "USERS",
+      },
+      { href: "/admin/places", label: "Établissements", permission: "PLACES" },
+      {
+        href: "/admin/reviews",
+        label: "Avis et signalements",
+        permission: "REVIEWS",
+      },
+      { href: "/admin/events", label: "Événements", permission: "EVENTS" },
+      {
+        href: "/admin/owner-requests",
+        label: "Demandes propriétaires",
+        permission: "OWNER_REQUESTS",
+      },
+      {
+        href: "/admin/categories",
+        label: "Catégories",
+        permission: "CATEGORIES",
+      },
+      {
+        href: "/owner/reservations",
+        label: "Toutes les réservations",
+        permission: "USERS",
+      },
+      { href: "/owner/analytics", label: "Statistiques", permission: "USERS" },
+      {
+        href: "/admin/messages",
+        label: "Envoyer des messages",
+        permission: "MESSAGES",
+      },
+      {
+        href: "/admin/audit",
+        label: "Journal d’administration",
+        permission: "AUDIT",
+      },
+    ];
   return (
     <div className="min-h-screen bg-gray-50">
-      <AdminNav />
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-          <div className="flex-1">
-            {children}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminNav() {
-  return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/admin/dashboard" className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary-500" />
-            <span className="font-bold text-lg">Quivibe Admin</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-primary-600 font-semibold text-sm">A</span>
-              </div>
-              <span className="text-sm font-medium text-gray-700 hidden md:block">Admin</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
-}
-
-function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
-  const tabs = [
-    { id: "overview", label: "Vue d'ensemble", icon: BarChart3, href: "/admin/dashboard" },
-    { id: "users", label: "Utilisateurs", icon: Users, href: "/admin/users" },
-    { id: "places", label: "Établissements", icon: Store, href: "/admin/places" },
-    { id: "reviews", label: "Avis", icon: Star, href: "/admin/reviews" },
-    { id: "owner-requests", label: "Demandes", icon: AlertTriangle, href: "/admin/owner-requests" },
-  ];
-
-  return (
-    <div className="lg:w-64 flex-shrink-0">
-      <div className="bg-white rounded-xl shadow-sm p-4 sticky top-24 border border-gray-100">
-        <div className="space-y-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <Link
-                key={tab.id}
-                href={tab.href}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                  isActive ? "bg-primary-50 text-primary-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="border-t border-gray-200 mt-4 pt-4">
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+      <header className="border-b bg-gray-950 text-white">
+        <div className="container flex flex-wrap items-center justify-between gap-3 py-5">
+          <Link
+            href="/admin/dashboard"
+            className="text-xl font-extrabold text-primary-300"
           >
-            <LogOut className="w-4 h-4" />
-            Déconnexion
-          </button>
+            Quivibe Administration
+          </Link>
+          <span>
+            {actor.name} ·{" "}
+            {actor.role === "ADMIN" ? "Administrateur" : "Collaborateur"}
+          </span>
+          <Link href="/" className="text-sm">
+            Retour à Quivibe
+          </Link>
         </div>
+      </header>
+      <div className="container grid gap-6 py-8 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <nav
+          aria-label="Administration"
+          className="flex flex-wrap content-start gap-2 rounded-2xl border bg-white p-4 lg:flex-col"
+        >
+          {links
+            .filter(
+              (link) => !link.permission || canAdmin(actor, link.permission),
+            )
+            .map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-xl px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-primary-50 hover:text-primary-700"
+              >
+                {link.label}
+              </Link>
+            ))}
+        </nav>
+        <div className="min-w-0">{children}</div>
       </div>
     </div>
   );

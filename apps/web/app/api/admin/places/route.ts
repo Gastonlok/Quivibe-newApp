@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { getAdminActor } from "@/features/admin/access";
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session || session.user?.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Non autorisé" },
-        { status: 401 }
-      );
+    const actor = await getAdminActor("PLACES");
+    if (!actor) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     const places = await prisma.place.findMany({
@@ -38,7 +35,7 @@ export async function GET() {
     console.error("Erreur:", error);
     return NextResponse.json(
       { error: "Une erreur est survenue" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

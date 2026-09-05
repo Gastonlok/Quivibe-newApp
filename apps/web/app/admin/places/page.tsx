@@ -1,10 +1,24 @@
 "use client";
 
+import { canAdmin } from "@/features/admin/permissions";
 import { useEffect, useState } from "react";
 import {
-  Store, Search, Loader2, Eye, CheckCircle, XCircle,
-  Building2, MapPin, Star, Calendar, Filter, Trash2,
-  Clock, AlertCircle, Plus, Pencil
+  Store,
+  Search,
+  Loader2,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Building2,
+  MapPin,
+  Star,
+  Calendar,
+  Filter,
+  Trash2,
+  Clock,
+  AlertCircle,
+  Plus,
+  Pencil,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -42,10 +56,31 @@ export default function AdminPlacesPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterNeighborhood, setFilterNeighborhood] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [feedback, setFeedback] = useState("");
+
+  async function reassignOwner(placeId: string) {
+    const ownerEmail = prompt(
+      "E-mail du nouveau propriétaire (compte propriétaire ou administrateur actif)",
+    );
+    if (!ownerEmail) return;
+    try {
+      const response = await fetch(`/api/admin/places/${placeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ownerEmail }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setFeedback("Propriétaire réaffecté.");
+      await fetchPlaces();
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : "Réaffectation impossible.");
+    }
+  }
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session || session.user?.role !== "ADMIN") {
+    if (!session || !canAdmin(session.user, "PLACES")) {
       router.push("/");
       return;
     }
@@ -81,7 +116,8 @@ export default function AdminPlacesPage() {
   };
 
   const handleDeletePlace = async (placeId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet établissement ?")) return;
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet établissement ?"))
+      return;
 
     try {
       const res = await fetch(`/api/admin/places/${placeId}`, {
@@ -97,11 +133,14 @@ export default function AdminPlacesPage() {
   };
 
   const filteredPlaces = places.filter((place) => {
-    const matchesSearch = place.name.toLowerCase().includes(search.toLowerCase()) ||
-                          place.owner.name.toLowerCase().includes(search.toLowerCase()) ||
-                          place.neighborhood.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = filterStatus === "all" || place.status === filterStatus;
-    const matchesNeighborhood = filterNeighborhood === "all" || place.neighborhood === filterNeighborhood;
+    const matchesSearch =
+      place.name.toLowerCase().includes(search.toLowerCase()) ||
+      place.owner.name.toLowerCase().includes(search.toLowerCase()) ||
+      place.neighborhood.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus =
+      filterStatus === "all" || place.status === filterStatus;
+    const matchesNeighborhood =
+      filterNeighborhood === "all" || place.neighborhood === filterNeighborhood;
     return matchesSearch && matchesStatus && matchesNeighborhood;
   });
 
@@ -117,7 +156,7 @@ export default function AdminPlacesPage() {
     REJECTED: "Rejeté",
   };
 
-  const neighborhoods = [...new Set(places.map(p => p.neighborhood))];
+  const neighborhoods = [...new Set(places.map((p) => p.neighborhood))];
 
   if (loading) {
     return (
@@ -129,6 +168,11 @@ export default function AdminPlacesPage() {
 
   return (
     <div>
+      {feedback && (
+        <p role="status" className="mb-4 rounded-xl border bg-white p-3">
+          {feedback}
+        </p>
+      )}
       <div className="mb-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -136,10 +180,13 @@ export default function AdminPlacesPage() {
               <Store className="w-8 h-8 text-primary-500" />
               Établissements
             </h1>
-            <p className="text-gray-500 mt-1">{places.length} établissements sur la plateforme</p>
+            <p className="text-gray-500 mt-1">
+              {places.length} établissements sur la plateforme
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
+              disabled={session?.user?.role !== "ADMIN"}
               onClick={() => setShowCreateModal(true)}
               className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-2"
             >
@@ -147,14 +194,20 @@ export default function AdminPlacesPage() {
               Créer un établissement
             </button>
             <div className="flex items-center gap-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors.APPROVED}`}>
-                {places.filter(p => p.status === "APPROVED").length} approuvés
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors.APPROVED}`}
+              >
+                {places.filter((p) => p.status === "APPROVED").length} approuvés
               </span>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors.PENDING}`}>
-                {places.filter(p => p.status === "PENDING").length} en attente
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors.PENDING}`}
+              >
+                {places.filter((p) => p.status === "PENDING").length} en attente
               </span>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors.REJECTED}`}>
-                {places.filter(p => p.status === "REJECTED").length} rejetés
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors.REJECTED}`}
+              >
+                {places.filter((p) => p.status === "REJECTED").length} rejetés
               </span>
             </div>
           </div>
@@ -189,7 +242,9 @@ export default function AdminPlacesPage() {
         >
           <option value="all">Tous les quartiers</option>
           {neighborhoods.map((hood) => (
-            <option key={hood} value={hood}>{hood}</option>
+            <option key={hood} value={hood}>
+              {hood}
+            </option>
           ))}
         </select>
         <button
@@ -228,20 +283,28 @@ export default function AdminPlacesPage() {
             <tbody className="divide-y divide-gray-100">
               {filteredPlaces.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={6}
+                    className="px-6 py-12 text-center text-gray-500"
+                  >
                     Aucun établissement trouvé
                   </td>
                 </tr>
               ) : (
                 filteredPlaces.map((place) => (
-                  <tr key={place.id} className="hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={place.id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                           <Store className="w-5 h-5 text-gray-400" />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{place.name}</p>
+                          <p className="font-medium text-gray-900">
+                            {place.name}
+                          </p>
                           <p className="text-xs text-gray-500 truncate max-w-[200px]">
                             {place.description}
                           </p>
@@ -249,18 +312,30 @@ export default function AdminPlacesPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">{place.owner.name}</p>
-                      <p className="text-xs text-gray-500">{place.owner.email}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {place.owner.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {place.owner.email}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                        <span className="text-sm text-gray-600">{place.neighborhood}</span>
+                        <span className="text-sm text-gray-600">
+                          {place.neighborhood}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[place.status as keyof typeof statusColors]}`}>
-                        {statusLabels[place.status as keyof typeof statusLabels]}
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[place.status as keyof typeof statusColors]}`}
+                      >
+                        {
+                          statusLabels[
+                            place.status as keyof typeof statusLabels
+                          ]
+                        }
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
@@ -280,14 +355,18 @@ export default function AdminPlacesPage() {
                         {place.status === "PENDING" && (
                           <>
                             <button
-                              onClick={() => handleStatusChange(place.id, "APPROVED")}
+                              onClick={() =>
+                                handleStatusChange(place.id, "APPROVED")
+                              }
                               className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
                               title="Approuver"
                             >
                               <CheckCircle className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleStatusChange(place.id, "REJECTED")}
+                              onClick={() =>
+                                handleStatusChange(place.id, "REJECTED")
+                              }
                               className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                               title="Rejeter"
                             >
@@ -297,7 +376,9 @@ export default function AdminPlacesPage() {
                         )}
                         {place.status === "APPROVED" && (
                           <button
-                            onClick={() => handleStatusChange(place.id, "REJECTED")}
+                            onClick={() =>
+                              handleStatusChange(place.id, "REJECTED")
+                            }
                             className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                             title="Désapprouver"
                           >
@@ -306,7 +387,9 @@ export default function AdminPlacesPage() {
                         )}
                         {place.status === "REJECTED" && (
                           <button
-                            onClick={() => handleStatusChange(place.id, "PENDING")}
+                            onClick={() =>
+                              handleStatusChange(place.id, "PENDING")
+                            }
                             className="p-1.5 text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors"
                             title="Remettre en attente"
                           >
@@ -321,14 +404,27 @@ export default function AdminPlacesPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </Link>
+                        {session?.user?.role === "ADMIN" && (
+                          <button
+                            onClick={() => void reassignOwner(place.id)}
+                            className="text-sm font-bold text-primary-700"
+                          >
+                            Réaffecter
+                          </button>
+                        )}
                         <Link
-                          href={`/owner/places/${place.id}/edit`}
+                          href={
+                            session?.user?.role === "ADMIN"
+                              ? `/owner/places/${place.id}/edit`
+                              : `/places/${place.slug}`
+                          }
                           className="p-1.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                           title="Modifier l'établissement"
                         >
                           <Pencil className="w-4 h-4" />
                         </Link>
                         <button
+                          disabled={session?.user?.role !== "ADMIN"}
                           onClick={() => handleDeletePlace(place.id)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           title="Supprimer"

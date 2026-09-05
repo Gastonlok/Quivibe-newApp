@@ -48,6 +48,17 @@ export function ReservationWidget({
   } | null>(null);
   const [waitlistMessage, setWaitlistMessage] = useState("");
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedDate = params.get("date");
+    const requestedParty = Number(params.get("partySize"));
+    if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+      const parsedDate = new Date(`${requestedDate}T12:00:00Z`);
+      if (!Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === requestedDate) setDate(requestedDate);
+    }
+    if (Number.isInteger(requestedParty) && requestedParty >= 1 && requestedParty <= maxPartySize) setPartySize(requestedParty);
+  }, [maxPartySize]);
+
   const partyOptions = useMemo(
     () => Array.from({ length: Math.max(1, maxPartySize) }, (_, index) => index + 1),
     [maxPartySize],
@@ -153,7 +164,7 @@ export function ReservationWidget({
   }
 
   return (
-    <aside className="rounded-3xl border border-gray-200 bg-white p-6 shadow-medium">
+    <aside id="reservation" className="scroll-mt-24 rounded-3xl border border-gray-200 bg-white p-6 shadow-medium">
       <h2 className="text-xl font-extrabold tracking-tight text-gray-950">
         Réserver une table
       </h2>

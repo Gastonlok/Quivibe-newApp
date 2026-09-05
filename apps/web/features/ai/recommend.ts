@@ -1,66 +1,70 @@
-import type { QuivibePlace, QuivibeRecommendation } from "./types";
-import { AMENITY_LABELS } from "@/features/places/amenities";
+﻿import type { QuivibePlace, QuivibeRecommendation } from "./types";
+import { normalize, updateContext, type SearchContext } from "./conversation";
+import { AMENITY_LABELS } from "../places/amenities";
 
-const budgetWords = ["pas cher", "abordable", "petit budget", "economique", "économique"];
-const premiumWords = ["chic", "luxe", "haut de gamme", "premium", "romantique", "date"];
-const livelyWords = ["sortir", "soir", "fete", "fête", "ambiance", "musique", "bar", "amis"];
-const amenityMatchers = [
-  { amenity: "BILLIARD", pattern: /b+illard/ },
-  { amenity: "POOL", pattern: /piscine|pool/ },
-  { amenity: "KARAOKE", pattern: /karaoke/ },
-  { amenity: "PARKING", pattern: /parking/ },
-  { amenity: "TERRACE", pattern: /terrasse/ },
-  { amenity: "WIFI", pattern: /wi-?fi|internet/ },
-  { amenity: "LIVE_MUSIC", pattern: /musique live|concert/ },
-] as const;
+const evidence: Record<string, RegExp> = {
+  calme: /calme|tranquille|paisible|cosy|reposant/,
+  animé: /anime|festif|dansant|musique|concert/,
+  chic: /chic|elegant|raffine|luxueux|haut de gamme/,
+  vue: /vue|panorama/,
+  photos: /photogenique|instagram|photos/,
+  romantique: /romantique|amoureux|intimiste/,
+  anniversaire: /anniversaire|celebration|evenement prive/,
+  amis: /convivial|amis|groupe/,
+  famille: /familial|famille|enfants/,
+  professionnel: /reunion|affaires|professionnel/,
+  detente: /detente|relax|repos|calme/,
+};
 
-function normalized(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function hasEvidence(description: string, pattern: RegExp) {
+  return description.split(/[.!?;\n]/).some((sentence) => pattern.test(sentence) && !/\b(pas|sans|aucun|non|ni)\b/.test(sentence));
 }
 
-export function recommendPlaces(query: string, places: QuivibePlace[]): QuivibeRecommendation[] {
-  const request = normalized(query);
-  const words = request.split(/[^a-z0-9]+/).filter((word) => word.length > 2);
-  const wantsBudget = budgetWords.some((word) => request.includes(normalized(word)));
-  const wantsPremium = premiumWords.some((word) => request.includes(normalized(word)));
-  const wantsLively = livelyWords.some((word) => request.includes(normalized(word)));
-  const requestedAmenity = amenityMatchers.find(({ pattern }) => pattern.test(request))?.amenity;
-  const needsAvailability = /disponib|reserv|ce soir|aujourd'hui|aujourdhui|demain/.test(request);
+const evidenceLabels: Record<string, string> = {
+  calme: "un cadre calme", animé: "une ambiance animée", chic: "un cadre élégant",
+  vue: "une vue", photos: "un cadre pour les photos", romantique: "un cadre romantique",
+  anniversaire: "des célébrations", amis: "un cadre convivial", famille: "un accueil familial",
+  professionnel: "des sorties professionnelles", detente: "un cadre propice à la détente",
+};
 
-  return places
-    .filter((place) => !requestedAmenity || place.amenities.includes(requestedAmenity))
-    .filter((place) => !needsAvailability || Boolean(place.availableSlot))
-    .map((place) => {
-      const searchable = normalized(`${place.name} ${place.description} ${place.category} ${place.neighborhood}`);
-      let score = (place.rating || 0) * 3 + (place.reservationsEnabled ? 1 : 0);
-      score += words.filter((word) => searchable.includes(word)).length * 8;
-      if (wantsBudget) score += Math.max(0, 5 - place.priceRange) * 2;
-      if (wantsPremium) score += place.priceRange * 2;
-      if (wantsLively && /bar|lounge|club|rooftop|musique|night/.test(searchable)) score += 6;
-      if (requestedAmenity && place.amenities.includes(requestedAmenity)) score += 30;
-      if (place.availableSlot) score += 15;
-
-      const reason = requestedAmenity && place.amenities.includes(requestedAmenity)
-        ? `${AMENITY_LABELS[requestedAmenity]} disponible dans cet établissement.`
-        : place.availableSlot
-          ? `Un créneau est disponible à ${place.availableSlot}.`
-        : words.some((word) => normalized(place.category).includes(word))
-        ? `Une option ${place.category.toLowerCase()} qui correspond à votre envie.`
-        : wantsBudget && place.priceRange <= 2
-          ? "Une option adaptée à un budget maîtrisé."
-          : wantsPremium && place.priceRange >= 3
-            ? "Une adresse plus soignée pour une sortie spéciale."
-            : place.rating
-              ? `Très bien noté par la communauté (${place.rating.toFixed(1)}/5).`
-              : `À découvrir du côté de ${place.neighborhood}.`;
-
-      return { ...place, score, reason };
-    })
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, "fr"))
+export function recommendPlaces(query: string | SearchContext, places: QuivibePlace[]): QuivibeRecommendation[] {
+  const context = typeof query === "string" ? updateContext(query) : query;
+  return places.map((place) => {
+    const description = normalize(place.description);
+    const text = normalize(`${place.name} ${place.description} ${place.category}`);
+    const reasons: string[] = [];
+    const missing: string[] = [];
+    // Location, category and declared facilities are requirements, not popularity boosts.
+    if (context.neighborhood && !normalize(place.neighborhood).includes(normalize(context.neighborhood))) return null;
+    if (context.category && !normalize(place.category).includes(normalize(context.category))) return null;
+    if (context.budget === "low" && place.priceRange > 2) return null;
+    if (context.budget === "medium" && place.priceRange > 3) return null;
+    if (context.amenities.some((a) => !place.amenities.includes(a))) return null;
+    let score = 0;
+    for (const mood of [...context.atmosphere, ...(context.occasion ? [context.occasion] : [])]) {
+      if (evidence[mood] && hasEvidence(description, evidence[mood])) { reasons.push(`la description mentionne ${evidenceLabels[mood]}`); score += 10; }
+      else missing.push(mood);
+    }
+    if (context.cuisine) {
+      if (text.includes(normalize(context.cuisine).replace(/e$/, ""))) { score += 10; reasons.push(`la description mentionne une cuisine ${context.cuisine}`); }
+      else missing.push(`cuisine ${context.cuisine}`);
+    }
+    if (context.neighborhood) reasons.push(`à ${place.neighborhood}`);
+    if (context.budget && context.budget !== "any") reasons.push(`gamme de prix ${"$".repeat(place.priceRange)}`);
+    for (const amenity of context.amenities) reasons.push(AMENITY_LABELS[amenity as keyof typeof AMENITY_LABELS] || amenity);
+    if (context.partySize && place.maxPartySize !== undefined && context.partySize > place.maxPartySize) missing.push(`réservation en ligne pour ${context.partySize} personnes`);
+    if (context.amount) missing.push(`budget exact de ${context.amount} (la gamme de prix ne permet pas de le garantir)`);
+    if (context.date || context.time) missing.push("disponibilité à vérifier dans le formulaire de réservation");
+    missing.push(...context.constraints.map((item) => `${item} à vérifier`));
+    if (!reasons.length) reasons.push(`${place.category} à ${place.neighborhood}`);
+    return { ...place, score, missing, reason: `${reasons.join(" ; ")}.${missing.length ? ` À confirmer : ${missing.join(", ")}.` : ""}` };
+  }).filter((place) => place !== null)
+    .sort((a, b) => a.missing.length - b.missing.length || b.score - a.score || (b.rating || 0) - (a.rating || 0) || a.name.localeCompare(b.name, "fr"))
+    .filter((place, _, all) => place.missing.length === all[0].missing.length)
     .slice(0, 3)
-    .map(({ score: _score, ...place }) => place);
+    .map(({ score: _score, missing, ...place }) => ({ ...place, partialMatch: missing.length > 0 }));
 }
 
 export function defaultIntroduction(count: number) {
-  return count === 0 ? "Je n’ai pas encore trouvé d’adresse qui corresponde exactement à cette envie. Essayez une autre ambiance ou un autre quartier." : `Voici ${count === 1 ? "une adresse" : `${count} adresses`} qui devraient vous plaire.`;
+  return count === 0 ? "Je n’ai pas trouvé de lieu réunissant ces critères sur Quivibe. Tu préfères élargir le quartier ou revoir un autre critère ?" : `J’ai ${count === 1 ? "une adresse" : `${count} adresses`} à te proposer.`;
 }

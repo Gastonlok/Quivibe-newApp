@@ -8,14 +8,44 @@ import {
   Store,
   Users,
 } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getAdminActor } from "@/features/admin/access";
+import { canAdmin, permissionLabels } from "@/features/admin/permissions";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") redirect("/");
+  const actor = await getAdminActor();
+  if (!actor) redirect("/");
+  if (actor.role !== "ADMIN") {
+    const sections = [
+      { permission: "PLACES" as const, path: "places" },
+      { permission: "REVIEWS" as const, path: "reviews" },
+      { permission: "EVENTS" as const, path: "events" },
+      { permission: "OWNER_REQUESTS" as const, path: "owner-requests" },
+    ];
+    return (
+      <main>
+        <h1 className="text-3xl font-extrabold">Mes missions de modération</h1>
+        <p className="mt-3 text-gray-600">
+          Voici les tâches qui vous sont confiées.
+        </p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {sections
+            .filter(({ permission }) => canAdmin(actor, permission))
+            .map(({ permission, path }) => (
+              <Link
+                key={path}
+                href={`/admin/${path}`}
+                className="rounded-2xl border bg-white p-6 font-bold text-primary-700"
+              >
+                {permissionLabels[permission]}
+              </Link>
+            ))}
+        </div>
+      </main>
+    );
+  }
 
   const [
     totalUsers,
@@ -88,14 +118,20 @@ export default async function AdminDashboard() {
         </span>
       </div>
 
-      {(pendingPlaces > 0 || pendingReviews > 0 || pendingOwnerRequests > 0) && (
+      {(pendingPlaces > 0 ||
+        pendingReviews > 0 ||
+        pendingOwnerRequests > 0) && (
         <section className="mb-7 rounded-3xl border border-amber-200 bg-amber-50 p-5">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
             <div>
-              <h2 className="font-extrabold text-amber-900">Actions requises</h2>
+              <h2 className="font-extrabold text-amber-900">
+                Actions requises
+              </h2>
               <p className="mt-1 text-sm leading-6 text-amber-800">
-                {pendingPlaces} établissement{pendingPlaces > 1 ? "s" : ""}, {pendingReviews} avis et {pendingOwnerRequests} demande{pendingOwnerRequests > 1 ? "s" : ""} propriétaire en attente.
+                {pendingPlaces} établissement{pendingPlaces > 1 ? "s" : ""},{" "}
+                {pendingReviews} avis et {pendingOwnerRequests} demande
+                {pendingOwnerRequests > 1 ? "s" : ""} propriétaire en attente.
               </p>
             </div>
           </div>

@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { canAdmin } from "@/features/admin/permissions";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Loader2, Star, User, Trash2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  Star,
+  User,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+} from "lucide-react";
 
 interface Review {
   id: string;
@@ -31,7 +40,7 @@ export default function AdminReviewsPage() {
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session || session.user?.role !== "ADMIN") {
+    if (!session || !canAdmin(session.user, "REVIEWS")) {
       router.push("/");
       return;
     }
@@ -113,7 +122,9 @@ export default function AdminReviewsPage() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Avis</h1>
-            <p className="text-gray-500 mt-1">{reviews.length} avis sur la plateforme</p>
+            <p className="text-gray-500 mt-1">
+              {reviews.length} avis sur la plateforme
+            </p>
           </div>
           <select
             value={filter}
@@ -146,8 +157,12 @@ export default function AdminReviewsPage() {
                       <User className="w-4 h-4 text-gray-500" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{review.author.name}</p>
-                      <p className="text-xs text-gray-500">{review.author.email}</p>
+                      <p className="font-medium text-gray-900">
+                        {review.author.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {review.author.email}
+                      </p>
                     </div>
                   </div>
 
@@ -173,28 +188,40 @@ export default function AdminReviewsPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       Sur <strong>{review.place.name}</strong>
                     </p>
-                    {review._count.reports > 0 && <p className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-red-700"><AlertCircle className="h-4 w-4" />{review._count.reports} signalement{review._count.reports > 1 ? "s" : ""} en attente</p>}
+                    {review._count.reports > 0 && (
+                      <p className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-red-700">
+                        <AlertCircle className="h-4 w-4" />
+                        {review._count.reports} signalement
+                        {review._count.reports > 1 ? "s" : ""} en attente
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    statusColors[review.status as keyof typeof statusColors]
-                  }`}>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      statusColors[review.status as keyof typeof statusColors]
+                    }`}
+                  >
                     {statusLabels[review.status as keyof typeof statusLabels]}
                   </span>
                   <div className="flex gap-1">
                     {review.status === "PENDING" && (
                       <>
                         <button
-                          onClick={() => handleStatusChange(review.id, "APPROVED")}
+                          onClick={() =>
+                            handleStatusChange(review.id, "APPROVED")
+                          }
                           className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
                           title="Approuver"
                         >
                           <CheckCircle className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleStatusChange(review.id, "REJECTED")}
+                          onClick={() =>
+                            handleStatusChange(review.id, "REJECTED")
+                          }
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           title="Rejeter"
                         >
@@ -203,6 +230,7 @@ export default function AdminReviewsPage() {
                       </>
                     )}
                     <button
+                      disabled={session?.user?.role !== "ADMIN"}
                       onClick={() => handleDelete(review.id)}
                       className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Supprimer"

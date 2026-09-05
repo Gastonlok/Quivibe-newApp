@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
+import { getAdminActor } from "@/features/admin/access";
 import { prisma } from "@/lib/prisma";
 import { sendOwnerRequestStatusEmail } from "@/lib/email";
 
@@ -12,9 +12,9 @@ const decisionSchema = z.object({
 type Context = { params: Promise<{ requestId: string }> };
 
 export async function PATCH(request: Request, { params }: Context) {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  const actor = await getAdminActor("OWNER_REQUESTS");
+  if (!actor) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
   try {
@@ -26,10 +26,15 @@ export async function PATCH(request: Request, { params }: Context) {
     const { requestId } = await params;
     const existing = await prisma.ownerRequest.findUnique({
       where: { id: requestId },
-      include: { user: { select: { id: true, name: true, email: true, role: true } } },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
     });
     if (!existing) {
-      return NextResponse.json({ error: "Demande introuvable" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Demande introuvable" },
+        { status: 404 },
+      );
     }
 
     const now = new Date();
@@ -40,7 +45,7 @@ export async function PATCH(request: Request, { params }: Context) {
           status: parsed.data.status,
           adminNote: parsed.data.adminNote || null,
           reviewedAt: now,
-          reviewedBy: session.user.id,
+          reviewedBy: actor.id,
         },
       });
 
@@ -49,14 +54,31 @@ export async function PATCH(request: Request, { params }: Context) {
         data: {
           ownerStatus: parsed.data.status,
           ownerVerifiedAt: parsed.data.status === "APPROVED" ? now : null,
-          role: parsed.data.status === "APPROVED" ? "OWNER" : existing.user.role,
+        },
+      });
+
+      if (parsed.data.status === "APPROVED") {
+        await tx.user.updateMany({
+          where: { id: existing.user.id, role: "USER" },
+          data: { role: "OWNER" },
+        });
+      }
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: actor.id,
+          action: "OWNER_REQUEST_REVIEWED",
+          targetId: requestId,
+          details: parsed.data,
         },
       });
 
       return updatedRequest;
     });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.AUTH_URL || "http://localhost:3000";
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.AUTH_URL ||
+      "http://localhost:3000";
     await sendOwnerRequestStatusEmail(
       existing.user.email,
       existing.user.name,
@@ -71,6 +93,9 @@ export async function PATCH(request: Request, { params }: Context) {
     return NextResponse.json({ request: result });
   } catch (error) {
     console.error("Erreur de traitement de la demande propriétaire:", error);
-    return NextResponse.json({ error: "Impossible de traiter la demande" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Impossible de traiter la demande" },
+      { status: 500 },
+    );
   }
 }
