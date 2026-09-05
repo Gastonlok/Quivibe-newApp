@@ -26,37 +26,6 @@ export function HeroSection() {
               Quivibe est votre guide pour explorer les meilleurs restaurants, bars, lounges et événements de la capitale.
               Des recommandations authentiques, des avis fiables, et une communauté qui partage sa passion pour la vie nocturne kinoise.
             </p>
-
-            {/* Statistiques */}
-            <div className="mt-8 flex flex-wrap gap-8">
-              <div className="flex items-center gap-2">
-                <div className="bg-primary-50 p-2 rounded-full">
-                  <Star className="w-5 h-5 text-primary-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">500+</p>
-                  <p className="text-sm text-gray-500">Avis vérifiés</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="bg-primary-50 p-2 rounded-full">
-                  <MapPin className="w-5 h-5 text-primary-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">100+</p>
-                  <p className="text-sm text-gray-500">Établissements</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="bg-primary-50 p-2 rounded-full">
-                  <Users className="w-5 h-5 text-primary-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">1K+</p>
-                  <p className="text-sm text-gray-500">Membres</p>
-                </div>
-              </div>
-            </div>
           </motion.div>
 
           {/* Images - Drapeau RDC + Restaurants + Plats */}

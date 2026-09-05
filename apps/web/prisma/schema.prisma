@@ -40,8 +40,70 @@ model User {
   receivedMessages MessageRecipient[]
   adminAuditLogs AdminAuditLog[]
   reservationHistory ReservationStatusEvent[]
+  newsletterCampaigns NewsletterCampaign[]
 
   @@map("users")
+}
+
+model NewsletterSubscriber {
+  id             String @id @default(cuid())
+  email          String @unique
+  status         String @default("PENDING")
+  tokenVersion   String
+  consentAt      DateTime @default(now())
+  requestedAt    DateTime @default(now())
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  deliveries     NewsletterDelivery[]
+
+  @@index([status, requestedAt])
+  @@map("newsletter_subscribers")
+}
+
+model NewsletterCampaign {
+  id          String @id
+  subject     String
+  body        String
+  revision    Int @default(1)
+  status      String @default("DRAFT")
+  createdAt   DateTime @default(now())
+  queuedAt    DateTime?
+  creatorId   String?
+  creator     User? @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  deliveries  NewsletterDelivery[]
+
+  @@index([createdAt])
+  @@map("newsletter_campaigns")
+}
+
+model NewsletterDelivery {
+  id             String @id @default(cuid())
+  dedupeKey      String @unique
+  subscriberId   String
+  subscriber     NewsletterSubscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       NewsletterCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind           String
+  tokenVersion   String
+  status         String @default("PENDING")
+  attempts       Int @default(0)
+  firstAttemptAt DateTime?
+  attemptAt      DateTime?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([status, attemptAt])
+  @@index([campaignId, status])
+  @@map("newsletter_deliveries")
+}
+
+model NewsletterRateLimit {
+  key       String @id
+  count     Int @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@map("newsletter_rate_limits")
 }
 
 model AdminMessage {

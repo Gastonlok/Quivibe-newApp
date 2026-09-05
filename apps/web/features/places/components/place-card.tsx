@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CalendarCheck2, MapPin, Star, Utensils } from "lucide-react";
 import { AnimatedCard } from "@/components/animated-section";
 import { FavoriteButton } from "@/features/favorites/components/favorite-button";
+import { placeSearchHref, type RestaurantSearch } from "../search-params";
 
 interface PlaceCardProps {
   place: {
@@ -20,31 +21,46 @@ interface PlaceCardProps {
     isFavorite?: boolean;
     reservationsEnabled?: boolean;
     events?: { id: string }[];
+    reviewCount?: number;
+    distanceKm?: number | null;
   };
+  searchContext?: Pick<RestaurantSearch, "date" | "time" | "partySize">;
 }
 
-export function PlaceCard({ place }: PlaceCardProps) {
+export function PlaceCard({ place, searchContext }: PlaceCardProps) {
   // ✅ Prendre la première image du restaurant (ou une image de plat)
-  const mainImage = place.media[0]?.url || "/images/placeholder.jpg";
+  const mainImage = place.media[0]?.url;
 
   // ✅ Prendre une image de plat si disponible (2ème image ou plus)
-  const foodImage = place.media[1]?.url || place.media[0]?.url || "/images/placeholder.jpg";
+  const foodImage = place.media[1]?.url || place.media[0]?.url;
 
   const category = place.categories[0]?.category.name || "Établissement";
   const priceLabels = ["$", "$$", "$$$", "$$$$"];
-  const reviewCount = place.reviews?.length || 0;
+  const reviewCount = place.reviewCount ?? place.reviews?.length ?? 0;
 
   return (
     <AnimatedCard className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-200 transition-all duration-300">
-      <Link href={`/places/${place.slug}?qv_source=SEARCH`} className="block group">
+      <Link
+        href={placeSearchHref(place.slug, searchContext)}
+        className="block group"
+      >
         <div className="relative h-56 overflow-hidden">
-          <Image
-            src={mainImage}
-            alt={place.name}
-            fill
-            className="object-cover group-hover:scale-110 transition-transform duration-500"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          />
+          {mainImage ? (
+            <Image
+              src={mainImage}
+              alt={place.name}
+              fill
+              className="object-cover group-hover:scale-110 transition-transform duration-500"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
+              <Utensils
+                className="h-14 w-14 text-primary-300"
+                aria-hidden="true"
+              />
+            </div>
+          )}
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
@@ -62,12 +78,21 @@ export function PlaceCard({ place }: PlaceCardProps) {
           {/* Miniature plat en bas à gauche */}
           <div className="absolute bottom-3 left-3 flex items-center gap-2">
             <div className="relative w-10 h-10 rounded-lg overflow-hidden border-2 border-white shadow-md">
-              <Image
-                src={foodImage}
-                alt="Plat"
-                fill
-                className="object-cover"
-              />
+              {foodImage ? (
+                <Image
+                  src={foodImage}
+                  alt="Plat"
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-primary-100">
+                  <Utensils
+                    className="h-5 w-5 text-primary-600"
+                    aria-hidden="true"
+                  />
+                </div>
+              )}
             </div>
             <div className="bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5">
               <Utensils className="w-3.5 h-3.5 text-white" />
@@ -95,7 +120,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
                 <span className="text-sm text-gray-500">{category}</span>
                 <span className="text-xs text-gray-300">•</span>
                 <span className="text-sm text-gray-500">
-                  {priceLabels.slice(0, place.priceRange).join(" ")}
+                  {priceLabels[place.priceRange - 1]}
                 </span>
               </div>
             </div>
@@ -104,6 +129,13 @@ export function PlaceCard({ place }: PlaceCardProps) {
           <div className="mt-3 flex items-center text-sm text-gray-500">
             <MapPin className="w-4 h-4 mr-1 flex-shrink-0 text-primary-400" />
             <span className="truncate">{place.neighborhood}</span>
+            {place.distanceKm != null && (
+              <span className="ml-auto shrink-0 pl-2 text-xs font-semibold text-primary-700">
+                {place.distanceKm < 1
+                  ? `${Math.round(place.distanceKm * 1000)} m`
+                  : `${place.distanceKm.toFixed(1)} km`}
+              </span>
+            )}
           </div>
 
           <div className="mt-3 flex items-center gap-2">
@@ -112,7 +144,8 @@ export function PlaceCard({ place }: PlaceCardProps) {
                 <Star
                   key={i}
                   className={`w-3.5 h-3.5 ${
-                    place.averageRating !== null && i < Math.floor(place.averageRating)
+                    place.averageRating !== null &&
+                    i < Math.floor(place.averageRating)
                       ? "fill-yellow-400 text-yellow-400"
                       : "text-gray-300 fill-gray-300"
                   }`}
@@ -124,20 +157,26 @@ export function PlaceCard({ place }: PlaceCardProps) {
                 {place.averageRating.toFixed(1)}
               </span>
             )}
-            <span className="text-xs text-gray-400">
-              ({reviewCount} avis)
-            </span>
+            <span className="text-xs text-gray-400">({reviewCount} avis)</span>
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
-            <span className="text-xs font-bold text-gray-500">Voir les détails</span>
+            <span className="text-xs font-bold text-gray-500">
+              Voir les détails
+            </span>
             {place.reservationsEnabled !== false && (
               <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-primary-700">
                 <CalendarCheck2 className="h-4 w-4" />
-                Réserver
+                {searchContext?.date
+                  ? `Disponible à ${searchContext.time}`
+                  : "Réserver"}
               </span>
             )}
-            {place.events?.length ? <span className="text-xs font-extrabold text-primary-700">Evenement a venir</span> : null}
+            {place.events?.length ? (
+              <span className="text-xs font-extrabold text-primary-700">
+                Evenement a venir
+              </span>
+            ) : null}
           </div>
         </div>
       </Link>

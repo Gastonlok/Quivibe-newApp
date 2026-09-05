@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CalendarCheck2,
   Heart,
@@ -28,11 +28,31 @@ const publicLinks = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const isHome = pathname === "/";
+  const header = useRef<HTMLElement>(null);
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   const authenticated =
     status === "authenticated" && Boolean(session?.user?.id);
   const role = session?.user?.role;
+
+  useEffect(() => {
+    const element = header.current;
+    if (!element) return;
+    const updateHeight = () => {
+      document.documentElement.style.setProperty(
+        "--site-header-height",
+        `${element.getBoundingClientRect().height}px`,
+      );
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--site-header-height");
+    };
+  }, []);
 
   const accountLinks = authenticated
     ? [
@@ -60,11 +80,14 @@ export function Navbar() {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur">
-      <div className="container flex h-18 items-center justify-between py-3">
+    <header
+      ref={header}
+      className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur"
+    >
+      <div className="container flex flex-wrap items-center justify-between gap-2 py-3">
         <Link
           href="/"
-          className="relative h-12 w-40 overflow-hidden rounded-lg"
+          className={`relative shrink-0 overflow-hidden rounded-lg ${isHome ? "h-10 w-24 min-[375px]:w-32 sm:h-12 sm:w-40" : "h-12 w-40"}`}
           onClick={() => setOpen(false)}
         >
           <Image
@@ -78,7 +101,7 @@ export function Navbar() {
         </Link>
 
         <nav
-          className="hidden items-center gap-1 lg:flex"
+          className={`hidden min-w-0 flex-wrap items-center justify-center gap-1 lg:flex ${isHome && authenticated ? "order-last basis-full" : "flex-1"}`}
           aria-label="Navigation principale"
         >
           {links.map(({ href, label, icon: Icon }) => {
@@ -101,6 +124,15 @@ export function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-2 lg:flex">
+          {isHome && (
+            <Link
+              href="/owners"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm font-extrabold text-primary-800 transition hover:border-primary-600 hover:bg-primary-100"
+            >
+              <Store className="h-4 w-4" aria-hidden="true" />
+              Devenez partenaire
+            </Link>
+          )}
           {dashboard && (
             <Link
               href={dashboard.href}
@@ -149,10 +181,20 @@ export function Navbar() {
           )}
         </div>
 
+        {isHome && (
+          <Link
+            href="/owners"
+            onClick={() => setOpen(false)}
+            className="ml-auto shrink-0 whitespace-nowrap rounded-full border border-primary-200 bg-primary-50 px-2.5 py-2.5 text-xs font-extrabold text-primary-800 transition hover:bg-primary-100 min-[375px]:px-3 sm:text-sm lg:hidden"
+          >
+            Devenez partenaire
+          </Link>
+        )}
+
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="rounded-full p-2 text-gray-700 lg:hidden"
+          className="shrink-0 rounded-full p-2 text-gray-700 lg:hidden"
           aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
           aria-expanded={open}
         >

@@ -17,7 +17,10 @@ export function recipientFilter(
 }
 
 // Durable per-recipient queue: no email work is lost if a web request ends early.
-export async function deliverAdminEmails(messageIds?: string[]) {
+export async function deliverAdminEmails(
+  messageIds?: string[],
+  budgetMs = 40_000,
+) {
   if (!process.env.RESEND_API_KEY)
     return { sent: 0, failed: 0, unavailable: true };
   const stale = new Date(Date.now() - 5 * 60_000);
@@ -48,12 +51,12 @@ export async function deliverAdminEmails(messageIds?: string[]) {
     orderBy: { id: "asc" },
     select: { id: true, emailFirstAttemptAt: true },
   });
-  const deadline = Date.now() + 40_000;
+  const deadline = Date.now() + budgetMs;
   let sent = 0;
   let failed = 0;
   let processed = 0;
   for (const { id, emailFirstAttemptAt } of entries) {
-    if (Date.now() > deadline) break;
+    if (Date.now() + 11000 > deadline) break;
     if (
       emailFirstAttemptAt &&
       emailFirstAttemptAt.getTime() < Date.now() - 23 * 60 * 60_000

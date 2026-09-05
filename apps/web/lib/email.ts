@@ -24,6 +24,8 @@ async function sendEmail(input: {
   subject: string;
   html: string;
   idempotencyKey?: string;
+  text?: string;
+  headers?: Record<string, string>;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return emailDisabledResult();
@@ -43,6 +45,8 @@ async function sendEmail(input: {
         to: [input.to],
         subject: input.subject,
         html: input.html,
+        ...(input.text ? { text: input.text } : {}),
+        ...(input.headers ? { headers: input.headers } : {}),
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
@@ -286,6 +290,48 @@ export function sendWaitlistAvailabilityEmail(
         label: "Voir les disponibilites",
         url: `${appUrl}/places/${placeSlug}`,
       },
+    ),
+  });
+}
+
+export function sendNewsletterConfirmationEmail(input: {
+  to: string;
+  confirmUrl: string;
+  unsubscribeUrl: string;
+  idempotencyKey: string;
+}) {
+  return sendEmail({
+    to: input.to,
+    subject: "Confirmez votre inscription à la newsletter Quivibe",
+    idempotencyKey: input.idempotencyKey,
+    text: `Confirmez votre inscription à la newsletter Quivibe : ${input.confirmUrl}\nCe lien est valable 72 heures. Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail ou annulez la demande : ${input.unsubscribeUrl}`,
+    html: emailLayout(
+      "Confirmez votre inscription",
+      `<p style="line-height:1.7">Vous avez demandé à recevoir les bonnes adresses et événements de Kinshasa. Confirmez votre adresse pour recevoir la newsletter Quivibe.</p><p>Ce lien est valable 72 heures.</p><p style="color:#766b61;font-size:13px">Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail ou <a href="${escapeHtml(input.unsubscribeUrl)}">annulez la demande</a>.</p>`,
+      { label: "Confirmer mon inscription", url: input.confirmUrl },
+    ),
+  });
+}
+export function sendNewsletterCampaignEmail(input: {
+  to: string;
+  subject: string;
+  body: string;
+  unsubscribeUrl: string;
+  oneClickUrl: string;
+  idempotencyKey: string;
+}) {
+  return sendEmail({
+    to: input.to,
+    subject: input.subject,
+    idempotencyKey: input.idempotencyKey,
+    text: `${input.body}\n\nVous recevez cet e-mail suite à votre inscription à la newsletter Quivibe. Se désinscrire : ${input.unsubscribeUrl}`,
+    headers: {
+      "List-Unsubscribe": `<${input.oneClickUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+    html: emailLayout(
+      input.subject,
+      `<p style="white-space:pre-wrap;line-height:1.7">${escapeHtml(input.body)}</p><p style="margin-top:28px;color:#766b61;font-size:13px">Vous recevez cet e-mail suite à votre inscription à la newsletter Quivibe. <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#b95000">Se désinscrire</a>.</p>`,
     ),
   });
 }

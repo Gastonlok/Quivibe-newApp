@@ -42,6 +42,8 @@ async function main() {
         "node_modules/vitest/vitest.mjs",
         "run",
         "features/reservations/service.integration.test.ts",
+        "features/places/search.integration.test.ts",
+        "features/newsletter/service.integration.test.ts",
       ],
       { env, stdio: "inherit" },
     );

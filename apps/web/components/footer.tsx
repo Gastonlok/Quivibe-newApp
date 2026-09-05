@@ -25,6 +25,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { NewsletterSubscribeForm } from "@/features/newsletter/components/subscribe-form";
+import { facebookUrl } from "@/lib/social";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -40,20 +42,11 @@ export function Footer() {
                 Recevez nos recommandations
               </h3>
               <p className="text-gray-400">
-                Les meilleures adresses et événements à Kinshasa, directement dans votre boîte mail.
+                Les meilleures adresses et événements à Kinshasa, directement
+                dans votre boîte mail.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="email"
-                placeholder="Votre email"
-                className="flex-1 px-4 py-3 rounded-full bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 transition-colors"
-              />
-              <button className="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-full transition-colors flex items-center justify-center gap-2 whitespace-nowrap">
-                S'abonner
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            <NewsletterSubscribeForm />
           </div>
         </div>
       </div>
@@ -70,19 +63,35 @@ export function Footer() {
               <span className="text-xl font-bold text-white">Quivibe</span>
             </Link>
             <p className="text-sm text-gray-400 mb-4">
-              La plateforme qui aide les Congolais à découvrir où sortir à Kinshasa.
+              La plateforme qui aide les Congolais à découvrir où sortir à
+              Kinshasa.
             </p>
             <div className="flex items-center gap-3">
-              <a href="#" className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors">
+              <a
+                href={facebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook Quivibe (nouvel onglet)"
+                className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors"
+              >
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="#" className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors">
+              <a
+                href="#"
+                className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors"
+              >
                 <Twitter className="w-4 h-4" />
               </a>
-              <a href="#" className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors">
+              <a
+                href="#"
+                className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors"
+              >
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="#" className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors">
+              <a
+                href="#"
+                className="w-9 h-9 bg-gray-800 hover:bg-primary-500 rounded-full flex items-center justify-center transition-colors"
+              >
                 <Youtube className="w-4 h-4" />
               </a>
             </div>
@@ -90,28 +99,42 @@ export function Footer() {
 
           {/* Pour les utilisateurs */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Pour les utilisateurs</h4>
+            <h4 className="text-white font-semibold mb-4">
+              Pour les utilisateurs
+            </h4>
             <ul className="space-y-2.5">
               <li>
-                <Link href="/discover" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/discover"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <Star className="w-3.5 h-3.5" />
                   Découvrir
                 </Link>
               </li>
               <li>
-                <Link href="/map" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/map"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <Sparkles className="w-3.5 h-3.5" />
                   Quivibe AI
                 </Link>
               </li>
               <li>
-                <Link href="/favorites" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/favorites"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <Heart className="w-3.5 h-3.5" />
                   Mes favoris
                 </Link>
               </li>
               <li>
-                <Link href="/events" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/events"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <PartyPopper className="w-3.5 h-3.5" />
                   Événements
                 </Link>
@@ -121,22 +144,33 @@ export function Footer() {
 
           {/* Pour les professionnels */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Pour les professionnels</h4>
+            <h4 className="text-white font-semibold mb-4">
+              Pour les professionnels
+            </h4>
             <ul className="space-y-2.5">
               <li>
-                <Link href="/owner/register" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/owner/register"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <Store className="w-3.5 h-3.5" />
                   Créer ma page
                 </Link>
               </li>
               <li>
-                <Link href="/owner/login" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/owner/login"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <Users className="w-3.5 h-3.5" />
                   Gérer mes avis
                 </Link>
               </li>
               <li>
-                <Link href="/owner/pricing" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                <Link
+                  href="/owner/pricing"
+                  className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
                   <Shield className="w-3.5 h-3.5" />
                   Rejoindre le pilote
                 </Link>
@@ -149,22 +183,34 @@ export function Footer() {
             <h4 className="text-white font-semibold mb-4">À propos</h4>
             <ul className="space-y-2.5">
               <li>
-                <Link href="/about" className="text-sm text-gray-400 hover:text-white transition-colors">
+                <Link
+                  href="/about"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
                   Qui sommes-nous
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-sm text-gray-400 hover:text-white transition-colors">
+                <Link
+                  href="/contact"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="text-sm text-gray-400 hover:text-white transition-colors">
+                <Link
+                  href="/privacy"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
                   Confidentialité
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="text-sm text-gray-400 hover:text-white transition-colors">
+                <Link
+                  href="/terms"
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
                   Conditions générales
                 </Link>
               </li>
@@ -181,7 +227,7 @@ export function Footer() {
               </li>
               <li className="flex items-start gap-3 text-sm text-gray-400">
                 <Phone className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary-400" />
-                <span>+243 812 345 678</span>
+                <span>+243 962 806 092</span>
               </li>
               <li className="flex items-start gap-3 text-sm text-gray-400">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary-400" />
@@ -200,13 +246,22 @@ export function Footer() {
               © {currentYear} Quivibe. Tous droits réservés.
             </p>
             <div className="flex flex-wrap items-center gap-6 text-sm">
-              <Link href="/privacy" className="text-gray-500 hover:text-gray-300 transition-colors">
+              <Link
+                href="/privacy"
+                className="text-gray-500 hover:text-gray-300 transition-colors"
+              >
                 Politique de confidentialité
               </Link>
-              <Link href="/terms" className="text-gray-500 hover:text-gray-300 transition-colors">
+              <Link
+                href="/terms"
+                className="text-gray-500 hover:text-gray-300 transition-colors"
+              >
                 CGU
               </Link>
-              <Link href="/cookies" className="text-gray-500 hover:text-gray-300 transition-colors">
+              <Link
+                href="/cookies"
+                className="text-gray-500 hover:text-gray-300 transition-colors"
+              >
                 Cookies
               </Link>
               <div className="flex items-center gap-2 text-gray-500">

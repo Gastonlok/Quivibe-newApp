@@ -40,6 +40,7 @@ export function ReservationWidget({
   const router = useRouter();
   const busy = useRef(false);
   const request = useRef<{ payload: string; key: string } | null>(null);
+  const requestedSlot = useRef<string | null>(null);
   const [date, setDate] = useState(tomorrow());
   const [partySize, setPartySize] = useState(2);
   const [time, setTime] = useState("");
@@ -57,6 +58,7 @@ export function ReservationWidget({
     const params = new URLSearchParams(window.location.search);
     const requestedDate = params.get("date");
     const requestedParty = Number(params.get("partySize"));
+    requestedSlot.current = params.get("time");
     if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
       const parsedDate = new Date(`${requestedDate}T12:00:00Z`);
       if (
@@ -90,6 +92,14 @@ export function ReservationWidget({
       .then((result) => {
         if (!active) return;
         setSlots(result.slots);
+        if (
+          requestedSlot.current &&
+          result.success &&
+          result.slots.includes(requestedSlot.current)
+        ) {
+          setTime(requestedSlot.current);
+        }
+        requestedSlot.current = null;
         setError(result.success ? "" : result.error || "");
       })
       .catch(() => {
@@ -139,6 +149,7 @@ export function ReservationWidget({
           const params = new URLSearchParams(window.location.search);
           params.set("date", date);
           params.set("partySize", String(partySize));
+          params.set("time", time);
           router.push(
             `/login?callbackUrl=${encodeURIComponent(`/places/${placeSlug}?${params}#reservation`)}`,
           );

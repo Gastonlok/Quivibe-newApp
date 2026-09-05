@@ -1,131 +1,98 @@
-// apps/web/app/page.tsx
-import { Suspense } from "react";
-import { PlaceCard } from "@/features/places/components/place-card";
-import { SearchBarAutocomplete } from "@/features/places/components/search-bar-autocomplete";
-import { Filters } from "@/features/places/components/filters";
-import { getPlaces, getTopRatedPlaces, getRecommendations } from "@/features/places/actions";
+﻿import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { RestaurantSearch } from "@/features/places/components/restaurant-search";
+import { SEARCH_KEYS } from "@/features/places/search-params";
+import {
+  getPlaces,
+  getTopRatedPlaces,
+  getRecommendations,
+} from "@/features/places/actions";
 import { HeroSection } from "@/components/hero-section";
 import { OwnerCTA } from "@/components/owner-cta";
 import { AnimatedSection } from "@/components/animated-section";
-import { CarouselSection, CarouselSkeleton } from "@/components/carousel-section";
+import { CarouselSection } from "@/components/carousel-section";
 import { Sparkles, Trophy, Star } from "lucide-react";
-
-// ============================================
-// PAGE PRINCIPALE (SERVER COMPONENT)
-// ============================================
 
 export const dynamic = "force-dynamic";
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; category?: string; neighborhood?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const isSearching = params.search || params.category || params.neighborhood;
-
-  // ✅ Charger les données côté serveur
+  const legacyQuery = new URLSearchParams();
+  for (const key of SEARCH_KEYS)
+    if (typeof params[key] === "string" && params[key])
+      legacyQuery.set(key, params[key] as string);
+  if (legacyQuery.size) redirect(`/discover?${legacyQuery}`);
   const [places, topRated, recommendations] = await Promise.all([
-    getPlaces({
-      search: params.search,
-      category: params.category,
-      neighborhood: params.neighborhood,
-    }),
+    getPlaces({}),
     getTopRatedPlaces(),
     getRecommendations(),
   ]);
-
   return (
     <>
-      {/* Hero Section */}
       <HeroSection />
-
-      <div className="container mx-auto px-4 py-8">
-        {/* Barre de recherche - Client Component */}
-        <Suspense fallback={<div className="h-12 bg-gray-100 rounded-lg animate-pulse" />}>
-          <SearchBarAutocomplete />
-        </Suspense>
-
-        {/* Filtres */}
-        <div className="mt-4 mb-8 flex flex-wrap items-center gap-4">
-          <Suspense fallback={<div className="h-10 w-48 bg-gray-100 rounded-lg animate-pulse" />}>
-            <Filters />
+      <div className="container relative z-10 mx-auto -mt-7 px-4 pb-10">
+        <div
+          data-testid="home-search-dock"
+          className="sticky top-[var(--site-header-height,73px)] z-40 rounded-3xl border border-gray-100 bg-white p-5 shadow-soft sm:p-7"
+        >
+          <h2 className="mb-4 text-xl font-extrabold tracking-tight text-gray-950">
+            Trouvez votre prochaine table
+          </h2>
+          <Suspense
+            fallback={
+              <div className="h-32 animate-pulse rounded-2xl bg-gray-50" />
+            }
+          >
+            <RestaurantSearch />
           </Suspense>
-          {!isSearching && (
-            <span className="text-sm text-gray-500">
-              {places.length} établissements à découvrir
-            </span>
-          )}
         </div>
-
-        {/* Résultats de recherche (affichage classique) */}
-        {isSearching ? (
-          <Suspense fallback={<CarouselSkeleton />}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {places.map((place) => (
-                <PlaceCard key={place.id} place={place} />
-              ))}
+        {topRated.length > 0 && (
+          <AnimatedSection delay={0.2}>
+            <div className="mt-12">
+              <CarouselSection
+                title="Les plus cotés"
+                icon={<Trophy className="h-6 w-6 text-yellow-500" />}
+                items={topRated}
+                viewAllLink="/discover?sort=rating"
+                itemsPerView={4}
+              />
             </div>
-            {places.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">Aucun résultat trouvé</p>
-              </div>
-            )}
-          </Suspense>
-        ) : (
-          <>
-            {/* Section : Les plus cotés */}
-            {topRated.length > 0 && (
-              <AnimatedSection delay={0.2}>
-                <div className="mt-12">
-                  <CarouselSection
-                    title="Les plus cotés"
-                    icon={<Trophy className="w-6 h-6 text-yellow-500" />}
-                    items={topRated}
-                    viewAllLink="/discover"
-                    itemsPerView={4}
-                  />
-                </div>
-              </AnimatedSection>
-            )}
-
-            {/* Section : Nos recommandations */}
-            {recommendations.length > 0 && (
-              <AnimatedSection delay={0.3}>
-                <div className="mt-12">
-                  <CarouselSection
-                    title="Nos recommandations"
-                    icon={<Sparkles className="w-6 h-6 text-primary-500" />}
-                    items={recommendations}
-                    viewAllLink="/discover"
-                    itemsPerView={4}
-                  />
-                </div>
-              </AnimatedSection>
-            )}
-
-            {/* Section : Nouveautés */}
-            {places.length > 0 && (
-              <AnimatedSection delay={0.4}>
-                <div className="mt-12">
-                  <CarouselSection
-                    title="Nouveautés"
-                    icon={<Star className="w-6 h-6 text-blue-500" />}
-                    items={places.slice(0, 12)}
-                    viewAllLink="/discover"
-                    itemsPerView={4}
-                  />
-                </div>
-              </AnimatedSection>
-            )}
-
-            {/* Call to Action pour propriétaires */}
-            <AnimatedSection delay={0.5}>
-              <div className="mt-16">
-                <OwnerCTA />
-              </div>
-            </AnimatedSection>
-          </>
+          </AnimatedSection>
         )}
+        {recommendations.length > 0 && (
+          <AnimatedSection delay={0.3}>
+            <div className="mt-12">
+              <CarouselSection
+                title="Nos recommandations"
+                icon={<Sparkles className="h-6 w-6 text-primary-500" />}
+                items={recommendations}
+                viewAllLink="/discover"
+                itemsPerView={4}
+              />
+            </div>
+          </AnimatedSection>
+        )}
+        {places.length > 0 && (
+          <AnimatedSection delay={0.4}>
+            <div className="mt-12">
+              <CarouselSection
+                title="Nouveautés"
+                icon={<Star className="h-6 w-6 text-blue-500" />}
+                items={places.slice(0, 12)}
+                viewAllLink="/discover?sort=recent"
+                itemsPerView={4}
+              />
+            </div>
+          </AnimatedSection>
+        )}
+        <AnimatedSection delay={0.5}>
+          <div className="mt-16">
+            <OwnerCTA />
+          </div>
+        </AnimatedSection>
       </div>
     </>
   );

@@ -28,6 +28,12 @@ const items: {
 }[] = [
   { href: "/admin/dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
   {
+    href: "/admin/newsletter",
+    label: "Newsletter",
+    icon: Send,
+    permission: "MESSAGES",
+  },
+  {
     href: "/admin/users",
     label: "Comptes et collaborateurs",
     icon: UsersRound,
