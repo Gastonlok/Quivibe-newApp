@@ -97,12 +97,10 @@ describe.skipIf(!url)("newsletter lifecycle on PostgreSQL", () => {
   }
   function mockEmail() {
     vi.stubEnv("RESEND_API_KEY", "mock-only");
-    const fetch = vi
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        json: async () => ({ id: "mock-provider" }),
-      });
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "mock-provider" }),
+    });
     vi.stubGlobal("fetch", fetch);
     return fetch;
   }
@@ -111,16 +109,21 @@ describe.skipIf(!url)("newsletter lifecycle on PostgreSQL", () => {
       ip = `${marker}-concurrent`,
       now = new Date();
     rateKeys.push(newsletterRateKey(ip, now));
-    await Promise.all([
-      subscribe(db, email, ip, now),
-      subscribe(db, email, ip, now),
-    ]);
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () => subscribe(db, email, ip, now)),
+    );
     const s = await db.newsletterSubscriber.findUniqueOrThrow({
       where: { email },
       include: { deliveries: true },
     });
     expect(s.status).toBe("PENDING");
     expect(s.deliveries).toHaveLength(1);
+    expect(results.filter(Boolean)).toEqual([s.deliveries[0].id]);
+    expect(
+      await db.newsletterRateLimit.findUniqueOrThrow({
+        where: { key: newsletterRateKey(ip, now) },
+      }),
+    ).toMatchObject({ count: 6 });
   });
   it("rejects expired and wrong-purpose confirmation links", async () => {
     const s = await pending();

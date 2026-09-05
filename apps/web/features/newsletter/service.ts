@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { readNewsletterToken, newsletterRateKey } from "./tokens";
 
@@ -24,11 +25,14 @@ async function transaction<T>(
       });
     } catch (error) {
       if (
-        n < 3 &&
+        n < 4 &&
         error instanceof Prisma.PrismaClientKnownRequestError &&
         ["P2034", "P2002"].includes(error.code)
-      )
+      ) {
+        // Let concurrent transactions commit before trying a fresh snapshot.
+        await delay(25 * 2 ** n + randomInt(25));
         continue;
+      }
       throw error;
     }
   }
