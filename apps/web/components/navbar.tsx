@@ -53,7 +53,11 @@ export function Navbar() {
         ? { href: "/owner/dashboard", label: "Espace pro", icon: Store }
         : null;
 
-  const links = [...publicLinks, ...accountLinks];
+  const links = [...publicLinks, ...accountLinks].filter(
+    ({ href }) =>
+      role !== "ADMIN" ||
+      !["/favorites", "/events", "/reservations", "/map"].includes(href),
+  );
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur">
