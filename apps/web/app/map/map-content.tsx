@@ -136,7 +136,7 @@ export function MapContent({ places }: { places: PublicMapPlace[] }) {
 
               <div className="flex gap-2 p-6 pt-0 sm:flex-col sm:pt-6">
                 <Link
-                  href={`/places/${selectedPlace.slug}`}
+                  href={`/places/${selectedPlace.slug}?qv_source=MAP`}
                   className="flex-1 rounded-full bg-primary-600 px-5 py-3 text-center text-sm font-extrabold text-white hover:bg-primary-700"
                 >
                   Voir et réserver

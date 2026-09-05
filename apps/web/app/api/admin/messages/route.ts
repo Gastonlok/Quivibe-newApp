@@ -10,6 +10,7 @@ export async function GET() {
   if (!(await getAdminActor("MESSAGES")))
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   const messages = await prisma.adminMessage.findMany({
+    where: { kind: "ADMIN" },
     take: 50,
     orderBy: { createdAt: "desc" },
     select: {

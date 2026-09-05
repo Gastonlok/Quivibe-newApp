@@ -4,14 +4,16 @@ import { CalendarDays, MapPin, Users } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listMyReservationsAction } from "@/features/reservations/actions";
 import { CancelReservationButton } from "@/features/reservations/components/cancel-reservation-button";
+import { ReservationHistory } from "@/features/reservations/components/reservation-history";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
   CONFIRMED: "Confirmée",
   CANCELLED: "Annulée",
-  COMPLETED: "Terminée",
+  COMPLETED: "Réalisée",
   NO_SHOW: "Non honorée",
 };
 
@@ -83,10 +85,12 @@ export default async function ReservationsPage() {
                         </Link>
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-                            STATUS_STYLES[reservation.status] || STATUS_STYLES.NO_SHOW
+                            STATUS_STYLES[reservation.status] ||
+                            STATUS_STYLES.NO_SHOW
                           }`}
                         >
-                          {STATUS_LABELS[reservation.status] || reservation.status}
+                          {STATUS_LABELS[reservation.status] ||
+                            reservation.status}
                         </span>
                       </div>
 
@@ -117,10 +121,13 @@ export default async function ReservationsPage() {
 
                     {canCancel && (
                       <div className="self-start">
-                        <CancelReservationButton reservationId={reservation.id} />
+                        <CancelReservationButton
+                          reservationId={reservation.id}
+                        />
                       </div>
                     )}
                   </div>
+                  <ReservationHistory events={reservation.history} />
                 </article>
               );
             })}

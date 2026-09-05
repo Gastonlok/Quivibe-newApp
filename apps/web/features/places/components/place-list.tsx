@@ -38,7 +38,7 @@ function PlaceCard({ place }: { place: PlaceWithDetails }) {
   const category = place.categories[0]?.category.name || "Établissement";
 
   return (
-    <Link href={`/places/${place.slug}`} className="group">
+    <Link href={`/places/${place.slug}?qv_source=SEARCH`} className="group">
       <div className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
         <div className="relative h-48">
           <Image

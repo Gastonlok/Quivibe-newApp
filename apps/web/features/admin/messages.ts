@@ -17,7 +17,7 @@ export function recipientFilter(
 }
 
 // Durable per-recipient queue: no email work is lost if a web request ends early.
-export async function deliverAdminEmails() {
+export async function deliverAdminEmails(messageIds?: string[]) {
   if (!process.env.RESEND_API_KEY)
     return { sent: 0, failed: 0, unavailable: true };
   const stale = new Date(Date.now() - 5 * 60_000);
@@ -34,6 +34,7 @@ export async function deliverAdminEmails() {
     },
   });
   const eligible: Prisma.MessageRecipientWhereInput = {
+    ...(messageIds ? { messageId: { in: messageIds } } : {}),
     emailAttempts: { lt: 3 },
     OR: [
       { emailStatus: "PENDING" },
@@ -87,10 +88,34 @@ export async function deliverAdminEmails() {
         user: {
           select: { email: true, emailVerified: true, suspendedAt: true },
         },
-        message: { select: { subject: true, body: true } },
+        message: {
+          select: {
+            subject: true,
+            body: true,
+            expiresAt: true,
+            expectedReservationStatus: true,
+            reservation: { select: { status: true } },
+          },
+        },
       },
     });
     if (!item) continue;
+    if (
+      (item.message.expiresAt &&
+        item.message.expiresAt.getTime() <= Date.now()) ||
+      (item.message.expectedReservationStatus &&
+        item.message.reservation?.status !==
+          item.message.expectedReservationStatus)
+    ) {
+      await prisma.messageRecipient.update({
+        where: { id },
+        data: {
+          emailStatus: "SKIPPED",
+          emailError: "Notification devenue obsolète.",
+        },
+      });
+      continue;
+    }
     if (item.user.suspendedAt || !item.user.emailVerified) {
       await prisma.messageRecipient.update({
         where: { id },

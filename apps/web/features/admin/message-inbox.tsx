@@ -59,7 +59,7 @@ export function MessageInbox() {
     <main className="container max-w-3xl py-10">
       <h1 className="text-3xl font-extrabold">Mes messages</h1>
       <p className="mt-2 text-gray-600">
-        Messages de l’équipe Quivibe · {unread} non lu(s)
+        Messages Quivibe et suivi des réservations · {unread} non lu(s)
       </p>
       {error && (
         <p role="alert" className="mt-4 text-red-700">

@@ -36,7 +36,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
 
   return (
     <AnimatedCard className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-200 transition-all duration-300">
-      <Link href={`/places/${place.slug}`} className="block group">
+      <Link href={`/places/${place.slug}?qv_source=SEARCH`} className="block group">
         <div className="relative h-56 overflow-hidden">
           <Image
             src={mainImage}

@@ -1,14 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, Clock3, Loader2, Users } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  Users,
+} from "lucide-react";
 import {
   createReservationAction,
   getAvailableSlotsAction,
   joinReservationWaitlistAction,
 } from "../actions";
 import { trackPlaceInteraction } from "@/features/owner/components/place-interaction-tracker";
+import { ensurePlaceVisit } from "@/features/owner/components/visit-session";
+import { kinshasaDay } from "../domain";
 
 interface ReservationWidgetProps {
   placeId: string;
@@ -17,16 +25,11 @@ interface ReservationWidgetProps {
 }
 
 function toLocalDateInput(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return kinshasaDay(value);
 }
 
 function tomorrow() {
-  const value = new Date();
-  value.setDate(value.getDate() + 1);
-  return toLocalDateInput(value);
+  return kinshasaDay(new Date(Date.now() + 24 * 60 * 60_000));
 }
 
 export function ReservationWidget({
@@ -35,6 +38,8 @@ export function ReservationWidget({
   maxPartySize,
 }: ReservationWidgetProps) {
   const router = useRouter();
+  const busy = useRef(false);
+  const request = useRef<{ payload: string; key: string } | null>(null);
   const [date, setDate] = useState(tomorrow());
   const [partySize, setPartySize] = useState(2);
   const [time, setTime] = useState("");
@@ -54,13 +59,26 @@ export function ReservationWidget({
     const requestedParty = Number(params.get("partySize"));
     if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
       const parsedDate = new Date(`${requestedDate}T12:00:00Z`);
-      if (!Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === requestedDate) setDate(requestedDate);
+      if (
+        !Number.isNaN(parsedDate.getTime()) &&
+        parsedDate.toISOString().slice(0, 10) === requestedDate
+      )
+        setDate(requestedDate);
     }
-    if (Number.isInteger(requestedParty) && requestedParty >= 1 && requestedParty <= maxPartySize) setPartySize(requestedParty);
+    if (
+      Number.isInteger(requestedParty) &&
+      requestedParty >= 1 &&
+      requestedParty <= maxPartySize
+    )
+      setPartySize(requestedParty);
   }, [maxPartySize]);
 
   const partyOptions = useMemo(
-    () => Array.from({ length: Math.max(1, maxPartySize) }, (_, index) => index + 1),
+    () =>
+      Array.from(
+        { length: Math.max(1, maxPartySize) },
+        (_, index) => index + 1,
+      ),
     [maxPartySize],
   );
 
@@ -74,6 +92,12 @@ export function ReservationWidget({
         setSlots(result.slots);
         setError(result.success ? "" : result.error || "");
       })
+      .catch(() => {
+        if (active) {
+          setSlots([]);
+          setError("Impossible de charger les disponibilités. Réessayez.");
+        }
+      })
       .finally(() => active && setLoadingSlots(false));
     return () => {
       active = false;
@@ -82,52 +106,88 @@ export function ReservationWidget({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    trackPlaceInteraction(placeId, "RESERVATION_START");
+    if (busy.current) return;
     if (!time) {
       setError("Sélectionnez une heure disponible.");
       return;
     }
 
     const form = new FormData(event.currentTarget);
+    busy.current = true;
     setSubmitting(true);
     setError("");
-
-    const result = await createReservationAction({
+    const input = {
       placeId,
       date,
       time,
       partySize,
       phone: String(form.get("phone") || ""),
       specialRequest: String(form.get("specialRequest") || ""),
-    });
-
-    setSubmitting(false);
-    if (!result.success) {
-      if (result.code === "UNAUTHENTICATED") {
-        router.push(`/login?callbackUrl=/places/${placeSlug}`);
+    };
+    const payload = JSON.stringify(input);
+    if (request.current?.payload !== payload)
+      request.current = { payload, key: crypto.randomUUID() };
+    try {
+      await ensurePlaceVisit(placeId);
+      trackPlaceInteraction(placeId, "RESERVATION_START");
+      const result = await createReservationAction({
+        ...input,
+        requestKey: request.current.key,
+      });
+      if (!result.success) {
+        if (result.code === "UNAUTHENTICATED") {
+          const params = new URLSearchParams(window.location.search);
+          params.set("date", date);
+          params.set("partySize", String(partySize));
+          router.push(
+            `/login?callbackUrl=${encodeURIComponent(`/places/${placeSlug}?${params}#reservation`)}`,
+          );
+          return;
+        }
+        setError(result.error);
         return;
       }
-      setError(result.error);
-      return;
-    }
 
-    setConfirmation({ reference: result.reference, status: result.status });
+      setConfirmation({ reference: result.reference, status: result.status });
+    } catch {
+      setError(
+        "La réponse n’a pas pu être reçue. Réessayez sans modifier le formulaire ou consultez vos réservations.",
+      );
+    } finally {
+      busy.current = false;
+      setSubmitting(false);
+    }
   }
 
   async function joinWaitlist() {
+    if (busy.current) return;
+    busy.current = true;
     setSubmitting(true);
     setError("");
-    const result = await joinReservationWaitlistAction({ placeId, date, partySize });
-    setSubmitting(false);
-    if (!result.success) {
-      if (result.code === "UNAUTHENTICATED") {
-        router.push(`/login?callbackUrl=/places/${placeSlug}`);
+    try {
+      const result = await joinReservationWaitlistAction({
+        placeId,
+        date,
+        partySize,
+      });
+      setSubmitting(false);
+      if (!result.success) {
+        if (result.code === "UNAUTHENTICATED") {
+          router.push(`/login?callbackUrl=/places/${placeSlug}`);
+          return;
+        }
+        setError(result.error);
         return;
       }
-      setError(result.error);
-      return;
+      setWaitlistMessage(
+        "Vous etes inscrit(e) sur la liste d'attente pour cette date.",
+      );
+    } catch {
+      setError("Impossible d’enregistrer la demande. Réessayez.");
+    } finally {
+      busy.current = false;
+      setSubmitting(false);
     }
-    setWaitlistMessage("Vous etes inscrit(e) sur la liste d'attente pour cette date.");
   }
 
   if (confirmation) {
@@ -137,7 +197,9 @@ export function ReservationWidget({
           <CheckCircle2 className="h-6 w-6 text-primary-600" />
         </div>
         <h2 className="mt-4 text-xl font-extrabold text-gray-950">
-          Table réservée
+          {confirmation.status === "CONFIRMED"
+            ? "Table réservée"
+            : "Demande enregistrée"}
         </h2>
         <p className="mt-2 text-sm leading-6 text-gray-600">
           {confirmation.status === "CONFIRMED"
@@ -164,7 +226,10 @@ export function ReservationWidget({
   }
 
   return (
-    <aside id="reservation" className="scroll-mt-24 rounded-3xl border border-gray-200 bg-white p-6 shadow-medium">
+    <aside
+      id="reservation"
+      className="scroll-mt-24 rounded-3xl border border-gray-200 bg-white p-6 shadow-medium"
+    >
       <h2 className="text-xl font-extrabold tracking-tight text-gray-950">
         Réserver une table
       </h2>
@@ -237,10 +302,21 @@ export function ReservationWidget({
           ) : (
             <div className="rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
               <p>Aucun créneau disponible pour cette date.</p>
-              <button type="button" onClick={joinWaitlist} disabled={submitting} className="mt-3 font-bold text-primary-700 hover:underline disabled:opacity-50">
-                {submitting ? "Inscription..." : "Me prévenir si une table se libère"}
+              <button
+                type="button"
+                onClick={joinWaitlist}
+                disabled={submitting}
+                className="mt-3 font-bold text-primary-700 hover:underline disabled:opacity-50"
+              >
+                {submitting
+                  ? "Inscription..."
+                  : "Me prévenir si une table se libère"}
               </button>
-              {waitlistMessage && <p className="mt-2 font-semibold text-primary-700">{waitlistMessage}</p>}
+              {waitlistMessage && (
+                <p className="mt-2 font-semibold text-primary-700">
+                  {waitlistMessage}
+                </p>
+              )}
             </div>
           )}
         </fieldset>
@@ -272,7 +348,10 @@ export function ReservationWidget({
         </label>
 
         {error && (
-          <p role="alert" className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+          <p
+            role="alert"
+            className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700"
+          >
             {error}
           </p>
         )}

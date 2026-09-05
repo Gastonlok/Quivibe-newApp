@@ -4,21 +4,24 @@ import { auth } from "@/lib/auth";
 import { listOwnerReservationsAction } from "@/features/reservations/actions";
 import { OwnerReservationActions } from "@/features/reservations/components/owner-reservation-actions";
 import { hasOwnerWorkspaceAccess } from "@/features/owner/access";
+import { ReservationHistory } from "@/features/reservations/components/reservation-history";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
   CONFIRMED: "Confirmée",
   CANCELLED: "Annulée",
-  COMPLETED: "Terminée",
+  COMPLETED: "Réalisée",
   NO_SHOW: "Non honorée",
 };
 
 export default async function OwnerReservationsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/owner/reservations");
-  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) redirect("/");
+  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role)))
+    redirect("/");
 
   const reservations = await listOwnerReservationsAction();
 
@@ -56,7 +59,8 @@ export default async function OwnerReservationsPage() {
                         {reservation.customer.name}
                       </h2>
                       <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-extrabold text-gray-700">
-                        {STATUS_LABELS[reservation.status] || reservation.status}
+                        {STATUS_LABELS[reservation.status] ||
+                          reservation.status}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
@@ -90,10 +94,20 @@ export default async function OwnerReservationsPage() {
                     </p>
                   </div>
 
-                  <OwnerReservationActions
-                    reservationId={reservation.id}
-                    currentStatus={reservation.status}
-                  />
+                  <div>
+                    <OwnerReservationActions
+                      reservationId={reservation.id}
+                      currentStatus={reservation.status}
+                      dateTime={reservation.dateTime.toISOString()}
+                    />
+                    {reservation.totalAmount !== null && (
+                      <p className="mt-3 text-sm font-semibold text-gray-700">
+                        Montant déclaré : {reservation.totalAmount.toFixed(2)}{" "}
+                        {reservation.currency}
+                      </p>
+                    )}
+                    <ReservationHistory events={reservation.history} />
+                  </div>
                 </article>
               ))}
             </div>

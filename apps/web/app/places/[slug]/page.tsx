@@ -16,6 +16,7 @@ import { siteUrl } from "@/lib/site";
 
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 interface PlacePageProps {
   params: Promise<{ slug: string }>;
 }

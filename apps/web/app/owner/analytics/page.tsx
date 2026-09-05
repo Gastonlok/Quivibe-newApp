@@ -1,8 +1,7 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowLeft,
-  BarChart3,
   CalendarCheck2,
   Eye,
   MousePointerClick,
@@ -11,231 +10,304 @@ import {
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasOwnerWorkspaceAccess } from "@/features/owner/access";
+import { pilotMetrics, pilotPeriod } from "@/features/owner/pilot-metrics";
+import { kinshasaDay } from "@/features/reservations/domain";
 
 export const dynamic = "force-dynamic";
-
-const kinshasaDayFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Africa/Kinshasa",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-function dayKey(date: Date) {
-  const parts = kinshasaDayFormatter.formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value || "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
-}
-
-function shortDay(date: Date) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    timeZone: "Africa/Kinshasa",
-    day: "2-digit",
-    month: "short",
-  }).format(date);
-}
+const percent = (value: number | null) =>
+  value === null ? "—" : `${value.toFixed(1)} %`;
 
 export default async function OwnerAnalyticsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/owner/analytics");
-  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role))) redirect("/");
-
-  const ownerFilter = session.user.role === "ADMIN" ? {} : { OR: [{ ownerId: session.user.id }, { collaborators: { some: { userId: session.user.id } } }] };
-  const relationFilter =
-    session.user.role === "ADMIN" ? {} : { place: ownerFilter };
-  const periodStart = new Date();
-  periodStart.setDate(periodStart.getDate() - 29);
-  periodStart.setHours(0, 0, 0, 0);
-
-  const [places, visits, reservations, interactions] = await Promise.all([
-    prisma.place.findMany({
-      where: ownerFilter,
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.placeVisit.findMany({
-      where: { visitedAt: { gte: periodStart }, ...relationFilter },
-      select: { placeId: true, visitorKey: true, visitedAt: true },
-    }),
-    prisma.reservation.findMany({
-      where: { createdAt: { gte: periodStart }, ...relationFilter },
-      select: { placeId: true, partySize: true, status: true },
-    }),
-    prisma.placeInteraction.findMany({
-      where: { createdAt: { gte: periodStart }, ...relationFilter },
-      select: { placeId: true, type: true },
-    }),
-  ]);
-
-  const uniqueVisitors = new Set(visits.map((visit) => visit.visitorKey)).size;
-  const totalGuests = reservations.reduce((total, reservation) => total + reservation.partySize, 0);
-  const confirmedReservations = reservations.filter((reservation) =>
-    ["CONFIRMED", "COMPLETED"].includes(reservation.status),
-  ).length;
-  const conversionRate = uniqueVisitors ? (reservations.length / uniqueVisitors) * 100 : 0;
-  const directions = interactions.filter((interaction) => interaction.type === "DIRECTIONS").length;
-  const favorites = interactions.filter((interaction) => interaction.type === "FAVORITE").length;
-  const reservationStarts = interactions.filter((interaction) => interaction.type === "RESERVATION_START").length;
-
-  const visitCountByPlace = new Map<string, number>();
-  const reservationCountByPlace = new Map<string, number>();
-  for (const visit of visits) {
-    visitCountByPlace.set(visit.placeId, (visitCountByPlace.get(visit.placeId) || 0) + 1);
-  }
-  for (const reservation of reservations) {
-    reservationCountByPlace.set(
-      reservation.placeId,
-      (reservationCountByPlace.get(reservation.placeId) || 0) + 1,
-    );
-  }
-
-  const dailyVisits = new Map<string, number>();
-  for (const visit of visits) {
-    const key = dayKey(visit.visitedAt);
-    dailyVisits.set(key, (dailyVisits.get(key) || 0) + 1);
-  }
+  if (!(await hasOwnerWorkspaceAccess(session.user.id, session.user.role)))
+    redirect("/");
+  const ownerFilter =
+    session.user.role === "ADMIN"
+      ? {}
+      : {
+          OR: [
+            { ownerId: session.user.id },
+            { collaborators: { some: { userId: session.user.id } } },
+          ],
+        };
+  const { start, end } = pilotPeriod();
+  const week = pilotPeriod(end, 7);
+  const [places, visits, reservations, interactions, favorites, activity] =
+    await Promise.all([
+      prisma.place.findMany({
+        where: ownerFilter,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          reservationsEnabled: true,
+          commercialStatus: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+      prisma.placeVisit.findMany({
+        where: { place: ownerFilter, visitedAt: { gte: start, lte: end } },
+        select: {
+          id: true,
+          placeId: true,
+          visitorKey: true,
+          visitedAt: true,
+          channel: true,
+        },
+      }),
+      prisma.reservation.findMany({
+        where: {
+          place: ownerFilter,
+          OR: [
+            { createdAt: { gte: start, lte: end } },
+            { dateTime: { gte: start, lte: end } },
+          ],
+        },
+        select: {
+          placeId: true,
+          createdAt: true,
+          dateTime: true,
+          status: true,
+          partySize: true,
+          attributedVisitId: true,
+        },
+      }),
+      prisma.placeInteraction.groupBy({
+        by: ["type"],
+        where: { place: ownerFilter, createdAt: { gte: start, lte: end } },
+        _count: true,
+      }),
+      prisma.favorite.count({ where: { place: ownerFilter } }),
+      prisma.reservationStatusEvent.findMany({
+        where: {
+          reservation: { place: ownerFilter },
+          createdAt: { gte: week.start, lte: end },
+          actorRole: { in: ["OWNER", "MANAGER", "EDITOR"] },
+        },
+        select: { reservation: { select: { placeId: true } } },
+      }),
+    ]);
+  const metrics = pilotMetrics(visits, reservations, start, end);
+  const eligible = places.filter(
+    (p) =>
+      p.status === "APPROVED" &&
+      p.reservationsEnabled &&
+      p.commercialStatus === "PILOT",
+  );
+  const active = new Set(activity.map((event) => event.reservation.placeId));
+  const activeCount = eligible.filter((place) => active.has(place.id)).length;
+  const byPlace = places.map((place) => ({
+    ...place,
+    metrics: pilotMetrics(
+      visits.filter((v) => v.placeId === place.id),
+      reservations.filter((r) => r.placeId === place.id),
+      start,
+      end,
+    ),
+    week: pilotMetrics(
+      [],
+      reservations.filter((r) => r.placeId === place.id),
+      week.start,
+      end,
+    ),
+  }));
   const chartDays = Array.from({ length: 14 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (13 - index));
-    return { date, key: dayKey(date), value: 0 };
-  }).map((day) => ({ ...day, value: dailyVisits.get(day.key) || 0 }));
-  const chartMaximum = Math.max(1, ...chartDays.map((day) => day.value));
-
+    const date = new Date(end.getTime() - (13 - index) * 24 * 60 * 60_000),
+      key = kinshasaDay(date);
+    return {
+      date,
+      key,
+      value: visits.filter((v) => kinshasaDay(v.visitedAt) === key).length,
+    };
+  });
+  const chartMax = Math.max(1, ...chartDays.map((day) => day.value));
+  const shortDay = (date: Date) =>
+    new Intl.DateTimeFormat("fr-FR", {
+      timeZone: "Africa/Kinshasa",
+      day: "2-digit",
+      month: "2-digit",
+    }).format(date);
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="container py-10">
-        <div className="rounded-3xl bg-gray-950 px-6 py-8 text-white shadow-medium sm:px-8">
+        <div className="rounded-3xl border border-primary-100 bg-white px-6 py-8 shadow-soft sm:px-8">
           <Link
             href="/owner/dashboard"
-            className="inline-flex items-center gap-2 text-sm font-bold text-gray-300 transition hover:text-white"
+            className="inline-flex items-center gap-2 text-sm font-bold text-primary-700"
           >
-            <ArrowLeft className="h-4 w-4" /> Retour a l&apos;espace pro
+            <ArrowLeft className="h-4 w-4" /> Espace professionnel
           </Link>
-          <div className="mt-6 flex flex-wrap items-end justify-between gap-5">
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary-300">
-                Pilotage de l&apos;activite
-              </p>
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
-                Statistiques des 30 derniers jours
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
-                Visites anonymisees, demandes de reservation et performance par etablissement.
-              </p>
-            </div>
-            <BarChart3 className="h-12 w-12 text-primary-300" />
-          </div>
+          <p className="mt-6 text-xs font-extrabold uppercase tracking-widest text-primary-700">
+            Pilote gratuit · sans commission
+          </p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-gray-950">
+            La valeur apportée par Quivibe
+          </h1>
+          <p className="mt-3 text-sm text-gray-600">
+            Du {shortDay(start)} au {shortDay(end)}, heure de Kinshasa.
+            Aujourd’hui est inclus jusqu’à maintenant.
+          </p>
         </div>
-
         <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Eye} label="Visites de fiche" value={visits.length} detail="pages publiques consultees" />
-          <MetricCard icon={Users} label="Visiteurs uniques" value={uniqueVisitors} detail="identifiants anonymes" />
           <MetricCard
             icon={CalendarCheck2}
-            label="Reservations creees"
-            value={reservations.length}
-            detail={`${confirmedReservations} confirmees ou realisees`}
+            label="Réservations réalisées"
+            value={metrics.completed}
+            detail={`${metrics.completedGuests} personnes accueillies, selon les déclarations du restaurant`}
+          />
+          <MetricCard
+            icon={CalendarCheck2}
+            label="Demandes reçues"
+            value={metrics.created}
+            detail="Réservations créées pendant ces 30 jours, tous statuts"
           />
           <MetricCard
             icon={MousePointerClick}
-            label="Conversion"
-            value={`${conversionRate.toFixed(1)}%`}
-            detail={`${totalGuests} couverts reserves`}
+            label="Visiteurs ayant réservé"
+            value={percent(metrics.conversion)}
+            detail={`${metrics.converters} sur ${metrics.trackedVisitors} visiteurs avec suivi de réservation`}
           />
-          <MetricCard icon={MousePointerClick} label="Actions d'intention" value={interactions.length} detail={`${reservationStarts} reservations, ${directions} itineraires, ${favorites} favoris`} />
+          <MetricCard
+            icon={Users}
+            label="Restaurants ayant traité une réservation"
+            value={`${activeCount} / ${eligible.length}`}
+            detail="Sur 7 jours, parmi les restaurants du pilote publiés et ouverts aux réservations"
+          />
+          <MetricCard
+            icon={Eye}
+            label="Visites de fiche"
+            value={metrics.visits}
+            detail={`${metrics.visitors} navigateurs distincts ; visites espacées d’au moins 30 minutes`}
+          />
+          <MetricCard
+            icon={Users}
+            label="Favoris actuels"
+            value={favorites}
+            detail="Utilisateurs ayant actuellement enregistré vos établissements"
+          />
         </section>
-
-        <section className="mt-8 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-extrabold text-gray-950">Visites quotidiennes</h2>
-                <p className="mt-1 text-sm text-gray-600">Les 14 derniers jours, heure de Kinshasa.</p>
-              </div>
-              <span className="text-sm font-extrabold text-primary-700">{visits.length} au total</span>
-            </div>
-            <div className="mt-8 flex h-52 items-end gap-2 sm:gap-3">
+        <section className="mt-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
+          <h2 className="text-xl font-extrabold text-gray-950">
+            Résultat des réservations arrivées à échéance
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            {metrics.due} réservations prévues entre le {shortDay(start)} et
+            maintenant, quelle que soit leur date de création.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <p className="rounded-2xl bg-gray-50 p-4">
+              <strong>
+                {metrics.cancelled} annulations ·{" "}
+                {percent(metrics.cancellationRate)}
+              </strong>
+              <span className="mt-1 block text-xs text-gray-500">
+                Part de toutes les réservations arrivées à échéance
+              </span>
+            </p>
+            <p className="rounded-2xl bg-gray-50 p-4">
+              <strong>
+                {metrics.noShow} absences · {percent(metrics.noShowRate)}
+              </strong>
+              <span className="mt-1 block text-xs text-gray-500">
+                Part des réservations réalisées ou déclarées non honorées
+              </span>
+            </p>
+            <p className="rounded-2xl bg-amber-50 p-4">
+              <strong>{metrics.unresolved} résultats à renseigner</strong>
+              <span className="mt-1 block text-xs text-gray-600">
+                Encore en attente ou confirmées après l’heure prévue
+              </span>
+            </p>
+          </div>
+          <Link
+            href="/owner/reservations"
+            className="mt-5 inline-block text-sm font-extrabold text-primary-700 hover:underline"
+          >
+            Mettre à jour les réservations
+          </Link>
+        </section>
+        <section className="mt-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
+          <h2 className="text-xl font-extrabold text-gray-950">
+            Visites quotidiennes
+          </h2>
+          <p className="mt-1 text-sm text-gray-600">
+            {chartDays.reduce((sum, day) => sum + day.value, 0)} visites sur les
+            14 derniers jours, heure de Kinshasa.
+          </p>
+          <div className="mt-6 overflow-x-auto">
+            <div className="flex h-52 min-w-[500px] items-end gap-3">
               {chartDays.map((day) => (
-                <div key={day.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                  <span className="text-xs font-extrabold text-gray-700">{day.value || ""}</span>
+                <div
+                  key={day.key}
+                  className="flex min-w-0 flex-1 flex-col items-center gap-2"
+                >
+                  <span className="text-xs font-bold text-gray-700">
+                    {day.value}
+                  </span>
                   <div className="flex h-36 w-full items-end rounded-t-xl bg-primary-50">
                     <div
-                      className="w-full rounded-t-xl bg-primary-600 transition-all"
-                      style={{ height: `${Math.max(day.value ? 10 : 2, (day.value / chartMaximum) * 100)}%` }}
+                      className="w-full rounded-t-xl bg-primary-600"
+                      style={{ height: `${(day.value / chartMax) * 100}%` }}
                       aria-label={`${day.value} visites le ${shortDay(day.date)}`}
                     />
                   </div>
-                  <span className="whitespace-nowrap text-[10px] font-bold text-gray-500 sm:text-xs">
+                  <span className="text-[10px] font-bold text-gray-500">
                     {shortDay(day.date)}
                   </span>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
-            <h2 className="text-xl font-extrabold text-gray-950">Etat des reservations</h2>
-            <div className="mt-5 space-y-3">
-              {[
-                ["En attente", "PENDING"],
-                ["Confirmees", "CONFIRMED"],
-                ["Realisees", "COMPLETED"],
-                ["Annulees", "CANCELLED"],
-                ["Absences", "NO_SHOW"],
-              ].map(([label, status]) => {
-                const value = reservations.filter((reservation) => reservation.status === status).length;
-                return (
-                  <div key={status} className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
-                    <span className="text-sm font-bold text-gray-700">{label}</span>
-                    <span className="text-lg font-extrabold text-gray-950">{value}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <Link href="/owner/reservations" className="mt-5 inline-flex text-sm font-extrabold text-primary-700 hover:underline">
-              Gerer les reservations
-            </Link>
-          </div>
         </section>
-
         <section className="mt-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-soft">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-extrabold text-gray-950">Performance par etablissement</h2>
-              <p className="mt-1 text-sm text-gray-600">Comparez l&apos;interet genere par chacune de vos fiches.</p>
-            </div>
-            <span className="text-sm font-bold text-gray-500">Periode glissante de 30 jours</span>
-          </div>
-          {places.length === 0 ? (
-            <p className="mt-6 rounded-2xl bg-gray-50 p-5 text-sm text-gray-600">
-              Ajoutez un etablissement pour commencer a suivre son activite.
+          <h2 className="text-xl font-extrabold text-gray-950">
+            Performance par établissement
+          </h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Les demandes sont comptées à leur création ; les réservations réalisées,
+            à la date de réservation.
+          </p>
+          {!places.length ? (
+            <p className="mt-6 text-gray-600">
+              Ajoutez un établissement pour commencer le suivi.
             </p>
           ) : (
             <div className="mt-6 overflow-x-auto">
-              <table className="min-w-full text-left">
-                <thead className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="pb-3 pr-5 font-extrabold">Etablissement</th>
-                    <th className="pb-3 pr-5 text-right font-extrabold">Visites</th>
-                    <th className="pb-3 pr-5 text-right font-extrabold">Reservations</th>
-                    <th className="pb-3 text-right font-extrabold">Action</th>
+                    {[
+                      "Établissement",
+                      "Visites / 30 j",
+                      "Demandes / 30 j",
+                      "Réalisées / 30 j",
+                      "Réalisées / 7 j",
+                      "Conversion",
+                    ].map((title) => (
+                      <th key={title} className="whitespace-nowrap px-3 py-3">
+                        {title}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {places.map((place) => (
-                    <tr key={place.id} className="border-b border-gray-100 last:border-0">
-                      <td className="py-4 pr-5 font-extrabold text-gray-900">{place.name}</td>
-                      <td className="py-4 pr-5 text-right text-sm font-bold text-gray-700">
-                        {visitCountByPlace.get(place.id) || 0}
-                      </td>
-                      <td className="py-4 pr-5 text-right text-sm font-bold text-gray-700">
-                        {reservationCountByPlace.get(place.id) || 0}
-                      </td>
-                      <td className="py-4 text-right">
-                        <Link href={`/owner/places/${place.id}/edit`} className="text-sm font-extrabold text-primary-700 hover:underline">
-                          Gerer
+                  {byPlace.map((place) => (
+                    <tr key={place.id} className="border-b border-gray-100">
+                      <td className="px-3 py-4 font-bold">
+                        <Link
+                          href={`/owner/places/${place.id}/edit`}
+                          className="text-primary-700"
+                        >
+                          {place.name}
                         </Link>
+                      </td>
+                      <td className="px-3">{place.metrics.visits}</td>
+                      <td className="px-3">{place.metrics.created}</td>
+                      <td className="px-3">{place.metrics.completed}</td>
+                      <td className="px-3">{place.week.completed}</td>
+                      <td className="px-3">
+                        {percent(place.metrics.conversion)}
                       </td>
                     </tr>
                   ))}
@@ -244,6 +316,50 @@ export default async function OwnerAnalyticsPage() {
             </div>
           )}
         </section>
+        <details className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">
+          <summary className="cursor-pointer font-bold text-gray-900">
+            Comprendre les indicateurs et leur couverture
+          </summary>
+          <div className="mt-3 space-y-3">
+            <p>
+              La conversion relie une visite de fiche à une réservation créée
+              ensuite, dans les 30 minutes, pour le même établissement. Un
+              navigateur compte une fois, même s’il réserve plusieurs fois. Une
+              réservation annulée reste une demande générée.
+            </p>
+            <p>
+              {metrics.trackedVisits} visites sur {metrics.visits} disposent du
+              nouveau suivi. Les visites anciennes sans ce suivi sont exclues du
+              calcul de conversion. {metrics.unattributed} demandes créées
+              pendant la période ne sont reliées à aucune visite. Un tiret
+              signifie qu’aucun taux ne peut encore être calculé.
+            </p>
+            <p>
+              Les identifiants de navigateur sont pseudonymes : un changement
+              d’appareil ou la suppression des cookies crée un autre visiteur.
+              Les visites des administrateurs et de l’équipe de l’établissement
+              sont exclues depuis l’activation de ce suivi.
+            </p>
+            <p>
+              Les résultats sont déclarés par le restaurant. Les changements
+              effectués par l’administration ne comptent pas comme activité du
+              restaurant. Les réservations futures sont exclues des résultats
+              réalisés, annulations et absences.
+            </p>
+            <p>
+              Actions suivies sur 30 jours (une par navigateur, établissement et
+              type toutes les 30 minutes) :{" "}
+              {interactions.find((i) => i.type === "RESERVATION_START")
+                ?._count || 0}{" "}
+              tentatives de réservation,{" "}
+              {interactions.find((i) => i.type === "DIRECTIONS")?._count || 0}{" "}
+              itinéraires,{" "}
+              {interactions.find((i) => i.type === "FAVORITE")?._count || 0}{" "}
+              ajouts aux favoris. Les données antérieures à l’activation
+              n’étaient pas dédoublonnées.
+            </p>
+          </div>
+        </details>
       </div>
     </main>
   );
@@ -262,12 +378,10 @@ function MetricCard({
 }) {
   return (
     <article className="rounded-3xl border border-gray-200 bg-white p-5 shadow-soft">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
-        <Icon className="h-5 w-5" />
-      </div>
-      <p className="mt-5 text-3xl font-extrabold tracking-tight text-gray-950">{value}</p>
+      <Icon className="h-6 w-6 text-primary-600" />
+      <p className="mt-4 text-3xl font-extrabold text-gray-950">{value}</p>
       <p className="mt-1 text-sm font-extrabold text-gray-700">{label}</p>
-      <p className="mt-1 text-xs font-semibold text-gray-500">{detail}</p>
+      <p className="mt-2 text-xs text-gray-500">{detail}</p>
     </article>
   );
 }

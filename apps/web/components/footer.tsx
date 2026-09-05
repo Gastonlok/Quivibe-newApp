@@ -138,7 +138,7 @@ export function Footer() {
               <li>
                 <Link href="/owner/pricing" className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
                   <Shield className="w-3.5 h-3.5" />
-                  Devenir premium
+                  Rejoindre le pilote
                 </Link>
               </li>
             </ul>

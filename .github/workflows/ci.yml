@@ -26,6 +26,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://quivibe:ci-only@127.0.0.1:5432/quivibe_ci?schema=public
       DIRECT_URL: postgresql://quivibe:ci-only@127.0.0.1:5432/quivibe_ci?schema=public
+      RESERVATION_TEST_DATABASE_URL: postgresql://quivibe:ci-only@127.0.0.1:5432/quivibe_ci?schema=public
       AUTH_SECRET: ci-only-secret-at-least-thirty-two-characters
       AUTH_URL: http://localhost:3000
       NEXT_PUBLIC_APP_URL: http://localhost:3000

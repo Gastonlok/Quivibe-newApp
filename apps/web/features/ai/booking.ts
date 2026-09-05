@@ -21,5 +21,6 @@ export function bookingHref(slug: string, context: SearchContext) {
   const date = bookingDate(context.date);
   if (date) params.set("date", date);
   if (context.partySize) params.set("partySize", String(context.partySize));
+  params.set("qv_source", "AI");
   return `/places/${encodeURIComponent(slug)}${params.size ? `?${params}` : ""}#reservation`;
 }

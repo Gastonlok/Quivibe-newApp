@@ -102,3 +102,33 @@ it("does not retry outside the provider's deduplication window", async () => {
     }),
   );
 });
+
+it("scopes immediate delivery to the current reservation's messages", async () => {
+  await deliverAdminEmails(["reservation-message"]);
+  expect(findMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        messageId: { in: ["reservation-message"] },
+      }),
+    }),
+  );
+});
+it.each([
+  { expiresAt: new Date(0) },
+  {
+    expectedReservationStatus: "CONFIRMED",
+    reservation: { status: "CANCELLED" },
+  },
+])("skips stale reminders before contacting the provider", async (message) => {
+  findUnique.mockResolvedValue({
+    user: { emailVerified: new Date(), suspendedAt: null },
+    message,
+  });
+  await deliverAdminEmails();
+  expect(send).not.toHaveBeenCalled();
+  expect(update).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({ emailStatus: "SKIPPED" }),
+    }),
+  );
+});

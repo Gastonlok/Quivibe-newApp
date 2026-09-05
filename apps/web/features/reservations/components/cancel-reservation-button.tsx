@@ -16,9 +16,14 @@ export function CancelReservationButton({
     if (!window.confirm("Annuler cette réservation ?")) return;
     setLoading(true);
     setError("");
-    const result = await cancelMyReservationAction(reservationId);
-    setLoading(false);
-    if (!result.success) setError(result.error);
+    try {
+      const result = await cancelMyReservationAction(reservationId);
+      if (!result.success) setError(result.error);
+    } catch {
+      setError("Impossible d’annuler la réservation. Réessayez.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -32,7 +37,9 @@ export function CancelReservationButton({
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}
         Annuler
       </button>
-      {error && <p className="mt-2 text-xs font-semibold text-red-700">{error}</p>}
+      {error && (
+        <p className="mt-2 text-xs font-semibold text-red-700">{error}</p>
+      )}
     </div>
   );
 }
