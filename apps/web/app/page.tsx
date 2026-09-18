@@ -25,11 +25,12 @@ export default async function HomePage({
     if (typeof params[key] === "string" && params[key])
       legacyQuery.set(key, params[key] as string);
   if (legacyQuery.size) redirect(`/discover?${legacyQuery}`);
-  const [places, topRated, recommendations] = await Promise.all([
+  const [places, topRatedPlaces] = await Promise.all([
     getPlaces({}),
     getTopRatedPlaces(),
-    getRecommendations(),
   ]);
+  const topRated = topRatedPlaces.slice(0, 4);
+  const recommendations = await getRecommendations(topRated.map((place) => place.id));
   return (
     <>
       <HeroSection />

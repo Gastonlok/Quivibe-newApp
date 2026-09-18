@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 import { siteUrl } from "@/lib/site";
 import { PlaceCard } from "@/features/places/components/place-card";
 import { slugify } from "@/utils/slugify";
@@ -27,7 +28,7 @@ export default async function NeighborhoodPage({ params }: PageProps) {
   if (!neighborhood) notFound();
   const places = await prisma.place.findMany({
     where: { status: "APPROVED", neighborhood },
-    include: { media: { take: 2, orderBy: { createdAt: "asc" } }, categories: { include: { category: true } }, reviews: { where: { status: "APPROVED" }, select: { rating: true } } },
+    include: { media: { take: 2, orderBy: placeMediaOrder }, categories: { include: { category: true } }, reviews: { where: { status: "APPROVED" }, select: { rating: true } } },
     orderBy: { createdAt: "desc" },
   });
   const cards = places.map((place) => ({ ...place, averageRating: place.reviews.length ? place.reviews.reduce((sum, review) => sum + review.rating, 0) / place.reviews.length : null }));

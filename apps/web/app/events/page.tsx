@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 import { EventsContent, type PublicEvent } from "./events-content";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export default async function EventsPage() {
           name: true,
           slug: true,
           neighborhood: true,
-          media: { take: 1, select: { url: true, altText: true } },
+          media: { take: 1, orderBy: placeMediaOrder, select: { url: true, altText: true } },
           categories: {
             take: 1,
             select: { category: { select: { name: true } } },

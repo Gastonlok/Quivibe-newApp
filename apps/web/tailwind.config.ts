@@ -43,7 +43,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-manrope)", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["var(--font-noto-sans)", "Arial", "Arial Unicode MS", "sans-serif"],
       },
       borderRadius: {
         xl: "1rem",

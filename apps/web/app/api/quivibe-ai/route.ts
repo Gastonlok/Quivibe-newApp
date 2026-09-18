@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 import { defaultIntroduction, recommendPlaces } from "@/features/ai/recommend";
 import { contextSchema, conversationalReply, normalize, updateContext } from "@/features/ai/conversation";
 import { composeReply, interpretRequest } from "@/features/ai/model";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       where: { status: "APPROVED" },
       select: { id: true, slug: true, name: true, description: true, neighborhood: true, priceRange: true, amenities: true, reservationsEnabled: true, maxPartySize: true, latitude: true, longitude: true,
         categories: { select: { category: { select: { name: true } } } },
-        media: { take: 1, orderBy: { createdAt: "asc" }, select: { url: true, altText: true } },
+        media: { take: 1, orderBy: placeMediaOrder, select: { url: true, altText: true } },
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
       },
       orderBy: { name: "asc" },

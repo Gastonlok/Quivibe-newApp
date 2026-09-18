@@ -2,6 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
@@ -77,7 +78,7 @@ export async function getFavorites() {
                 category: true,
               },
             },
-            media: true,
+            media: { orderBy: placeMediaOrder },
             reviews: {
               where: {
                 status: "APPROVED",

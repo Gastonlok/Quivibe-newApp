@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, Clock3, MapPin, Utensils } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function EventPage({ params }: EventPageProps) {
       media: { take: 1 },
       place: {
         include: {
-          media: { take: 1 },
+          media: { take: 1, orderBy: placeMediaOrder },
           categories: { take: 1, include: { category: true } },
         },
       },

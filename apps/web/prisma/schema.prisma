@@ -420,6 +420,7 @@ model Media {
   id        String   @id @default(cuid())
   url       String
   altText   String?
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   placeId   String?
   place     Place?   @relation(fields: [placeId], references: [id], onDelete: Cascade)

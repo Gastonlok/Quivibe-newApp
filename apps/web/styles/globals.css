@@ -9,7 +9,7 @@
 
   html {
     scroll-behavior: smooth;
-    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+    @apply font-sans;
   }
 
   body {

@@ -105,7 +105,7 @@ export function AdminSidebar({ user }: { user: SidebarUser }) {
   const pathname = usePathname();
 
   return (
-    <aside className="border-b border-gray-200 bg-white lg:sticky lg:top-[4.5rem] lg:h-[calc(100vh-4.5rem)] lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r">
+    <aside className="border-b border-gray-200 bg-white lg:sticky lg:top-16 lg:h-[calc(100dvh-4rem)] lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r">
       <div className="flex min-h-full flex-col p-4 lg:p-6">
         <Link
           href="/admin/dashboard"

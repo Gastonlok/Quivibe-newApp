@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
+import { Noto_Sans } from "next/font/google";
 import "@/styles/globals.css";
 import "@/styles/theme.css";
 import "leaflet/dist/leaflet.css";
 import { Navbar } from "@/components/navbar";
 import { PageNavigation } from "@/components/page-navigation";
 import { Footer } from "@/components/footer";
+import { PublicChrome } from "@/components/public-chrome";
 import { SessionProvider } from "next-auth/react";
 import { siteUrl } from "@/lib/site";
+
+const notoSans = Noto_Sans({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-noto-sans",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -24,13 +33,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className={notoSans.variable}>
       <body className="flex min-h-screen flex-col bg-gray-50 text-gray-950">
         <SessionProvider>
-          <Navbar />
-          <PageNavigation />
+          <PublicChrome>
+            <Navbar />
+            <PageNavigation />
+          </PublicChrome>
           <div className="flex-1">{children}</div>
-          <Footer />
+          <PublicChrome>
+            <Footer />
+          </PublicChrome>
         </SessionProvider>
       </body>
     </html>

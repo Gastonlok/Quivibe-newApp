@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "./media-order";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 import { slugify } from "@/utils/slugify";
@@ -128,7 +129,7 @@ export async function getPlaces(input: z.infer<typeof getPlacesSchema>) {
           category: true,
         },
       },
-      media: true,
+      media: { orderBy: placeMediaOrder },
       reviews: {
         where: {
             status: "APPROVED",
@@ -215,7 +216,7 @@ export async function listPlacesAction(
               category: true,
             },
           },
-          media: true,
+          media: { orderBy: placeMediaOrder },
           reviews: {
             where: {
                 status: "APPROVED",
@@ -303,9 +304,7 @@ export async function getPlaceBySlug(slug: string) {
           },
         },
         media: {
-          orderBy: {
-            createdAt: "asc",
-          },
+          orderBy: placeMediaOrder,
         },
         reviews: {
           where: {
@@ -519,7 +518,7 @@ export async function getTopRatedPlaces() {
             category: true,
           },
         },
-        media: true,
+        media: { orderBy: placeMediaOrder },
         reviews: {
           where: {
               status: "APPROVED",
@@ -562,7 +561,7 @@ export async function getTopRatedPlaces() {
 // RECOMMENDATIONS
 // ============================================
 
-export async function getRecommendations() {
+export async function getRecommendations(excludedPlaceIds: string[] = []) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
@@ -589,11 +588,12 @@ export async function getRecommendations() {
     const places = await prisma.place.findMany({
       where: {
         status: "APPROVED",
+        ...(excludedPlaceIds.length > 0 ? { id: { notIn: excludedPlaceIds } } : {}),
         ...(userId ? { favorites: { none: { userId } } } : {}),
       },
       include: {
         categories: { include: { category: true } },
-        media: true,
+        media: { orderBy: placeMediaOrder },
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
         favorites: userId
           ? { where: { userId }, select: { userId: true } }

@@ -12,12 +12,14 @@ import {
   Link2,
   Loader2,
   Save,
+  Star,
   Trash2,
   Upload,
 } from "lucide-react";
 import {
   addOwnerPlaceImageAction,
   deleteOwnerPlaceImageAction,
+  setOwnerPlaceFeaturedImageAction,
   updateOwnerPlaceAction,
   uploadOwnerPlaceImageAction,
 } from "../actions";
@@ -186,6 +188,26 @@ export function OwnerPlaceEditor({
       void deleteOwnerPlaceImageAction(place.id, mediaId).then((result) =>
         setResult(result, "L'image a ete retiree."),
       );
+    });
+  }
+
+  function featureImage(mediaId: string) {
+    startTransition(async () => {
+      try {
+        const result = await setOwnerPlaceFeaturedImageAction(
+          place.id,
+          mediaId,
+        );
+        setResult(result, "L’image mise en avant a été modifiée.");
+      } catch {
+        setResult(
+          {
+            success: false,
+            error: "Impossible de changer l’image mise en avant. Réessayez.",
+          },
+          "",
+        );
+      }
     });
   }
 
@@ -538,8 +560,8 @@ export function OwnerPlaceEditor({
               Vos images
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              La premiere image est utilisee comme visuel principal de votre
-              fiche.
+              Choisissez l’image mise en avant sur votre fiche et dans les
+              listes d’établissements. Vous pouvez ajouter une photo ci-dessous.
             </p>
           </div>
           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-extrabold text-gray-700">
@@ -561,7 +583,7 @@ export function OwnerPlaceEditor({
                 />
                 {index === 0 && (
                   <span className="absolute left-3 top-3 rounded-full bg-gray-950/80 px-3 py-1 text-xs font-extrabold text-white">
-                    Image principale
+                    Image mise en avant
                   </span>
                 )}
               </div>
@@ -579,6 +601,17 @@ export function OwnerPlaceEditor({
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
+              {index !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => featureImage(media.id)}
+                  disabled={isPending}
+                  className="mx-3 mb-3 inline-flex items-center gap-2 rounded-xl bg-primary-50 px-3 py-2 text-sm font-bold text-primary-800 transition hover:bg-primary-100 disabled:opacity-50"
+                >
+                  <Star className="h-4 w-4" aria-hidden="true" />
+                  Mettre en avant
+                </button>
+              )}
             </article>
           ))}
         </div>

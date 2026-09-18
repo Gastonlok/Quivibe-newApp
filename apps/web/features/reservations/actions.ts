@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 import { hasOwnerWorkspaceAccess } from "@/features/owner/access";
 import { deliverAdminEmails } from "@/features/admin/messages";
 import {
@@ -251,7 +252,7 @@ export async function listMyReservationsAction() {
           slug: true,
           neighborhood: true,
           phone: true,
-          media: { take: 1, select: { url: true, altText: true } },
+          media: { take: 1, orderBy: placeMediaOrder, select: { url: true, altText: true } },
         },
       },
     },

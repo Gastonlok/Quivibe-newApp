@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { placeMediaOrder } from "./media-order";
 import {
   ACTIVE_STATUSES,
   getScheduleSlots,
@@ -236,7 +237,7 @@ export async function searchRestaurants(
       reservationsEnabled: true,
       media: {
         take: 2,
-        orderBy: { createdAt: "asc" },
+        orderBy: placeMediaOrder,
         select: { url: true, altText: true },
       },
       categories: { select: { category: { select: { name: true } } } },

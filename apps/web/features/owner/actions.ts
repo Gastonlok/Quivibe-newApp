@@ -40,6 +40,7 @@ async function getManagedPlace(placeId: string) {
 }
 
 function refreshOwnerPlace(place: { id: string; slug: string }) {
+  revalidatePath("/", "layout");
   revalidatePath("/admin/places");
   revalidatePath("/owner/dashboard");
   revalidatePath("/owner/analytics");
@@ -270,6 +271,52 @@ export async function uploadOwnerPlaceImageAction(
 
   refreshOwnerPlace(managed.place);
   return { success: true as const, media };
+}
+
+export async function setOwnerPlaceFeaturedImageAction(
+  placeId: string,
+  mediaId: string,
+) {
+  const managed = await getManagedPlace(placeId);
+  if ("error" in managed) {
+    return { success: false as const, error: managed.error || "Accès refusé." };
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Serialize cover changes for this place, including concurrent selections.
+      await tx.place.update({
+        where: { id: managed.place.id },
+        data: { updatedAt: new Date() },
+      });
+      const media = await tx.media.findFirst({
+        where: { id: mediaId, placeId: managed.place.id },
+        select: { id: true },
+      });
+      if (!media)
+        return {
+          success: false as const,
+          error: "Image introuvable dans cet établissement.",
+        };
+
+      await tx.media.updateMany({
+        where: { placeId: managed.place.id, sortOrder: { not: 0 } },
+        data: { sortOrder: 0 },
+      });
+      await tx.media.update({
+        where: { id: media.id, placeId: managed.place.id },
+        data: { sortOrder: -1 },
+      });
+      return { success: true as const };
+    });
+    if (result.success) refreshOwnerPlace(managed.place);
+    return result;
+  } catch {
+    return {
+      success: false as const,
+      error: "Impossible de changer l’image mise en avant. Réessayez.",
+    };
+  }
 }
 
 export async function deleteOwnerPlaceImageAction(

@@ -130,6 +130,34 @@ describe.skipIf(!url)("restaurant search on PostgreSQL", () => {
       second.places.every((p) => !first.places.some((a) => a.id === p.id)),
     ).toBe(true);
   });
+  it("shows the selected cover first and falls back after its deletion", async () => {
+    const placeId = placeIds[14];
+    const original = await db.media.create({
+      data: {
+        placeId,
+        url: "https://example.com/original.jpg",
+        createdAt: new Date("2020-01-01"),
+      },
+    });
+    const cover = await db.media.create({
+      data: { placeId, url: "https://example.com/cover.jpg", sortOrder: -1 },
+    });
+    try {
+      const result = await search({ sort: "rating" });
+      expect(result.places[0].media.map((image) => image.url)).toEqual([
+        cover.url,
+        original.url,
+      ]);
+      await db.media.delete({ where: { id: cover.id } });
+      expect((await search({ sort: "rating" })).places[0].media[0].url).toBe(
+        original.url,
+      );
+    } finally {
+      await db.media.deleteMany({
+        where: { id: { in: [original.id, cover.id] } },
+      });
+    }
+  });
   it("sorts by budget and review average before selecting the first page", async () => {
     expect((await search({ sort: "price" })).places[0].id).toBe(placeIds[14]);
     expect((await search({ sort: "rating" })).places[0].id).toBe(placeIds[14]);

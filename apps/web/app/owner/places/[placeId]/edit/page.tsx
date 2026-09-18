@@ -9,6 +9,7 @@ import { OwnerPlaceWorkspace } from "@/features/owner/components/owner-place-wor
 import { canManageCollaborators, getPlaceAccess } from "@/features/owner/access";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { placeMediaOrder } from "@/features/places/media-order";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function OwnerPlaceEditPage({
       where: { id: placeId },
       include: {
         categories: { include: { category: true } },
-        media: { orderBy: { createdAt: "asc" }, select: { id: true, url: true, altText: true } },
+        media: { orderBy: placeMediaOrder, select: { id: true, url: true, altText: true } },
         menuItems: { orderBy: { sortOrder: "asc" } },
         collaborators: { include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: "asc" } },
         reviews: {
