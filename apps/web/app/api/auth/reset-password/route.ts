@@ -22,7 +22,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ce lien est invalide ou a expire." }, { status: 400 });
     }
 
-    await prisma.user.update({ where: { email }, data: { passwordHash } });
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({ where: { email }, data: { passwordHash } });
+      await tx.session.deleteMany({ where: { userId: user.id, sessionToken: { startsWith: "mobile:" } } });
+    });
     return NextResponse.json(
       { message: "Votre mot de passe a ete mis a jour." },
       { headers: { "Cache-Control": "no-store" } },

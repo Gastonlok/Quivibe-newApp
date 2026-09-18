@@ -1,3 +1,4 @@
+import { mobileIdentity } from "@/features/mobile/context";
 // apps/web/lib/auth.ts
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -32,29 +33,7 @@ class AuthServiceUnavailableError extends CredentialsSignin {
   code = "auth-service-unavailable";
 }
 
-export const {
-  handlers,
-  signIn,
-  signOut,
-  auth: sessionAuth,
-} = NextAuth({
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 jours
-  },
-  pages: {
-    signIn: "/login",
-    signOut: "/",
-    error: "/auth/error",
-  },
-  providers: [
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Mot de passe", type: "password" },
-      },
-      async authorize(rawCredentials) {
+export async function authenticateCredentials(rawCredentials: unknown) {
         try {
           // Validation des credentials
           const parsed = loginSchema.safeParse(rawCredentials);
@@ -102,7 +81,31 @@ export const {
           console.error("Erreur d'authentification:", error);
           throw new AuthServiceUnavailableError();
         }
+}
+
+export const {
+  handlers,
+  signIn,
+  signOut,
+  auth: sessionAuth,
+} = NextAuth({
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 jours
+  },
+  pages: {
+    signIn: "/login",
+    signOut: "/",
+    error: "/auth/error",
+  },
+  providers: [
+    Credentials({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Mot de passe", type: "password" },
       },
+      authorize: authenticateCredentials,
     }),
   ],
   callbacks: {
@@ -152,6 +155,8 @@ export const {
 
 // Deleted or suspended accounts lose access on their next server request.
 export async function auth() {
+  const mobileSession = mobileIdentity.getStore();
+  if (mobileSession !== undefined) return mobileSession;
   const session = await sessionAuth();
   return session?.user?.id && session.user.role !== "DISABLED" ? session : null;
 }

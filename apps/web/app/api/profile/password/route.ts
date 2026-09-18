@@ -17,6 +17,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Mot de passe actuel incorrect." }, { status: 400 });
   }
 
-  await prisma.user.update({ where: { id: session.user.id }, data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) } });
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: session.user.id }, data: { passwordHash } });
+    await tx.session.deleteMany({ where: { userId: session.user.id, sessionToken: { startsWith: "mobile:" } } });
+  });
   return NextResponse.json({ message: "Mot de passe mis a jour." });
 }
